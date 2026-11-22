@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"id": "toolx",
+	"version": "${version}",
+	"name": "ToolX",
+	"description": "A simple client-side utility mod for Vanilla Minecraft.",
+	"authors": [
+		"TacoVN"
+	],
+	"license": "All Rights Reserved",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.toolx.ToolXClient"
+		]
+	},
+	"mixins": [
+		{
+			"config": "toolx.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25"
+	}
+}

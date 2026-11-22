@@ -1,0 +1,15 @@
+{
+	"required": true,
+	"package": "com.toolx.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"CreditsAndAttributionScreenMixin",
+		"KeyboardHandlerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
