@@ -50,7 +50,7 @@ public abstract class KeyboardHandlerMixin {
 		}
 
 		this.debugFeedbackComponent(
-			Component.translatableWithFallback("debug.cycle_renderdistance.message", "RenderDistance: %s", renderDistance.get())
+			Component.translatableWithFallback("debug.cycle_renderdistance.message", "Render Distance: %s", renderDistance.get())
 		);
 		cir.setReturnValue(true);
 	}
