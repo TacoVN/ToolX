@@ -17,6 +17,8 @@ public final class ToolXConfig {
 	private static ToolXConfig instance;
 
 	public boolean f3F = true;
+	public boolean pieChart2DMode = true;
+	public boolean pieChartAutoReset = true;
 
 	public static ToolXConfig get() {
 		if (instance == null) {

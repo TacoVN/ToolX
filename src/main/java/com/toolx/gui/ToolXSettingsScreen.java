@@ -22,6 +22,7 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 	protected void addOptions() {
 		ToolXConfig config = ToolXConfig.get();
 		this.addGeneralSection(config);
+		this.addPieChartSection(config);
 	}
 
 	@Override
@@ -34,6 +35,14 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 		this.addToggleSection(
 			"General",
 			createToggle("F3 + F", config.f3F, value -> config.f3F = value, config)
+		);
+	}
+
+	private void addPieChartSection(ToolXConfig config) {
+		this.addToggleSection(
+			"Pie Chart",
+			createToggle("2D Mode", config.pieChart2DMode, value -> config.pieChart2DMode = value, config),
+			createToggle("Auto Reset", config.pieChartAutoReset, value -> config.pieChartAutoReset = value, config)
 		);
 	}
 

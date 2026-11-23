@@ -4,7 +4,10 @@
 	"compatibilityLevel": "JAVA_25",
 	"client": [
 		"CreditsAndAttributionScreenMixin",
-		"KeyboardHandlerMixin"
+		"GuiProfilerChartRendererMixin",
+		"KeyboardHandlerMixin",
+		"MinecraftMixin",
+		"ProfilerPieChartMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
