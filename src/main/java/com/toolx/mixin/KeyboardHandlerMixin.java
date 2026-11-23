@@ -1,6 +1,7 @@
 package com.toolx.mixin;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.toolx.PieChartController;
 import com.toolx.ToolXConfig;
 import net.minecraft.client.KeyboardHandler;
 import net.minecraft.client.Minecraft;
@@ -14,6 +15,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(KeyboardHandler.class)
@@ -53,5 +55,16 @@ public abstract class KeyboardHandlerMixin {
 			Component.translatableWithFallback("debug.cycle_renderdistance.message", "Render Distance: %s", renderDistance.get())
 		);
 		cir.setReturnValue(true);
+	}
+
+	@Inject(method = "keyPress", at = @At("TAIL"))
+	private void toolx$handleRadarKey(long handle, int action, KeyEvent event, CallbackInfo info) {
+		if (handle == 0L || handle != this.minecraft.getWindow().handle() || action != 1) {
+			return;
+		}
+		if (this.minecraft.options.keyDebugModifier.isDown()) {
+			return;
+		}
+		PieChartController.handleRadarKey(this.minecraft, InputConstants.getKey(event));
 	}
 }

@@ -4,9 +4,14 @@
 	"compatibilityLevel": "JAVA_25",
 	"client": [
 		"CreditsAndAttributionScreenMixin",
+		"DebugScreenEntryListAccessor",
+		"DebugScreenOverlayAccessor",
 		"GuiProfilerChartRendererMixin",
 		"KeyboardHandlerMixin",
 		"MinecraftMixin",
+		"MouseHandlerMixin",
+		"OptionsMixin",
+		"ProfilerPieChartAccessor",
 		"ProfilerPieChartMixin"
 	],
 	"injectors": {

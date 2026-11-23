@@ -34,6 +34,9 @@ public abstract class GuiProfilerChartRendererMixin {
 		double totalPercentage = 0.0;
 		for (ResultField result : chartState.chartData()) {
 			double slicePercentage = result.percentage;
+			if (slicePercentage <= 0.0) {
+				continue;
+			}
 			double currentPercentage = totalPercentage;
 			totalPercentage += slicePercentage;
 			int steps = Math.max(1, Mth.ceil(slicePercentage * 2.4));

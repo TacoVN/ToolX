@@ -39,11 +39,11 @@ public abstract class MinecraftMixin {
 
 	@Inject(method = "disconnect(Lnet/minecraft/client/gui/screens/Screen;ZZ)V", at = @At("HEAD"))
 	private void toolx$resetPieTrackingOnDisconnect(Screen screen, boolean keepResourcePacks, boolean stopSound, CallbackInfo info) {
-		PieChartController.resetTracking();
+		PieChartController.resetTracking((Minecraft) (Object) this);
 	}
 
 	@Inject(method = "clearClientLevel(Lnet/minecraft/client/gui/screens/Screen;)V", at = @At("HEAD"))
 	private void toolx$resetPieTrackingOnClearLevel(Screen screen, CallbackInfo info) {
-		PieChartController.resetTracking();
+		PieChartController.resetTracking((Minecraft) (Object) this);
 	}
 }
