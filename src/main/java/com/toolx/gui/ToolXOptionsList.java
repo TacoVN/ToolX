@@ -20,7 +20,6 @@ import net.minecraft.network.chat.MutableComponent;
 
 public class ToolXOptionsList extends OptionsList {
 	private static final int HEADER_HEIGHT = 14;
-	private static final int FIRST_HEADER_HEIGHT = 14;
 	private static final int HEADER_TEXT_OFFSET = -4;
 	private static final int FIRST_HEADER_TEXT_OFFSET = -3;
 	private final OptionsSubScreen screen;
@@ -34,11 +33,11 @@ public class ToolXOptionsList extends OptionsList {
 	@Override
 	public void addHeader(Component text) {
 		boolean first = this.firstHeader;
-		this.addEntry(new CompactHeaderEntry(text, first), first ? FIRST_HEADER_HEIGHT : HEADER_HEIGHT);
+		this.addEntry(new CompactHeaderEntry(text, first), HEADER_HEIGHT);
 		this.firstHeader = false;
 	}
 
-	public KeyBindEntry addKeyBind(
+	public void addKeyBind(
 		Component label,
 		Supplier<InputConstants.Key> getter,
 		BooleanSupplier isSelected,
@@ -47,7 +46,6 @@ public class ToolXOptionsList extends OptionsList {
 	) {
 		KeyBindEntry entry = new KeyBindEntry(label, getter, isSelected, onSelect, onReset);
 		this.addEntry(entry);
-		return entry;
 	}
 
 	public void refreshKeyBinds() {
@@ -125,7 +123,6 @@ public class ToolXOptionsList extends OptionsList {
 
 		@Override
 		public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float a) {
-			this.updateChangeButtonMessage();
 			int rowLeft = ToolXOptionsList.this.screen.width / 2 - 155;
 			int rowRight = rowLeft + 310;
 			int buttonY = this.getContentY();

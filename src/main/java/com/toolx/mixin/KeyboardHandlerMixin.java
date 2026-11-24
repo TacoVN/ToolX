@@ -30,7 +30,7 @@ public abstract class KeyboardHandlerMixin {
 
 	@Inject(method = "handleDebugKeys", at = @At("TAIL"), cancellable = true)
 	private void toolx$handleCycleRenderDistance(KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
-		if (!ToolXConfig.get().f3F || event.key() != InputConstants.KEY_F) {
+		if (Boolean.TRUE.equals(cir.getReturnValue()) || !ToolXConfig.get().f3F || event.key() != InputConstants.KEY_F) {
 			return;
 		}
 

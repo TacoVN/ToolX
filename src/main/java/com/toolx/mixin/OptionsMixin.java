@@ -22,7 +22,7 @@ public abstract class OptionsMixin {
 	private void toolx$reapplyRadarFovAfterSave(CallbackInfo info) {
 		if (this.toolx$restoredFovForSave) {
 			this.toolx$restoredFovForSave = false;
-			PieChartController.finishOptionsSave((Options) (Object) this, true);
+			PieChartController.finishOptionsSave((Options) (Object) this);
 		}
 	}
 }

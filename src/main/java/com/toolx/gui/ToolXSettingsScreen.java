@@ -143,6 +143,11 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		if (this.selectedKeyBind != null) {
+			if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
+				this.selectedKeyBind = null;
+				this.toolXList.refreshKeyBinds();
+				return super.mouseClicked(event, doubleClick);
+			}
 			this.applyKeyBind(InputConstants.Type.MOUSE.getOrCreate(event.button()));
 			return true;
 		}
