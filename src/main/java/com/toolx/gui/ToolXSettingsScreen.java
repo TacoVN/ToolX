@@ -22,6 +22,7 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 	private @Nullable KeyBindTarget selectedKeyBind;
 
 	private enum KeyBindTarget {
+		EYE_MEASUREMENT,
 		ENDAR,
 		PIEDAR,
 		PREEMPTIVE_NAVIGATION
@@ -36,6 +37,8 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 		ToolXConfig config = ToolXConfig.get();
 		this.addGeneralSection(config);
 		this.addPieChartSection(config);
+		this.addMcsrSection(config);
+		this.toolXList.refreshKeyBinds();
 	}
 
 	@Override
@@ -106,7 +109,25 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 				this.toolXList.refreshKeyBinds();
 			}
 		);
-		this.toolXList.refreshKeyBinds();
+	}
+
+	private void addMcsrSection(ToolXConfig config) {
+		this.addHeader("MCSR");
+		this.toolXList.addKeyBind(
+			Component.literal("Eye Measurement"),
+			config::eyeMeasurementKey,
+			() -> this.selectedKeyBind == KeyBindTarget.EYE_MEASUREMENT,
+			() -> {
+				this.selectedKeyBind = KeyBindTarget.EYE_MEASUREMENT;
+				this.toolXList.refreshKeyBinds();
+			},
+			() -> {
+				this.selectedKeyBind = null;
+				config.setEyeMeasurementKey(InputConstants.UNKNOWN);
+				config.save();
+				this.toolXList.refreshKeyBinds();
+			}
+		);
 	}
 
 	private void addToggleSection(String title, AbstractWidget... widgets) {
@@ -129,7 +150,9 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 		ToolXConfig config = ToolXConfig.get();
 		KeyBindTarget target = this.selectedKeyBind;
 		this.selectedKeyBind = null;
-		if (target == KeyBindTarget.ENDAR) {
+		if (target == KeyBindTarget.EYE_MEASUREMENT) {
+			config.setEyeMeasurementKey(key);
+		} else if (target == KeyBindTarget.ENDAR) {
 			config.setEndarKey(key);
 		} else if (target == KeyBindTarget.PIEDAR) {
 			config.setPiedarKey(key);

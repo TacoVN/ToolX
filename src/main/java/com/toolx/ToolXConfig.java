@@ -18,11 +18,15 @@ public final class ToolXConfig {
 	private static ToolXConfig instance;
 
 	public boolean f3F = true;
+	public String eyeMeasurementKey = InputConstants.UNKNOWN.getName();
+	public double eyeMeasurementHudX = 0.0;
+	public double eyeMeasurementHudY = 0.5;
 	public boolean pieChart2DMode = true;
 	public boolean pieChartAutoReset = true;
 	public String endarKey = InputConstants.UNKNOWN.getName();
 	public String piedarKey = InputConstants.UNKNOWN.getName();
 	public String preemptiveNavigationKey = InputConstants.UNKNOWN.getName();
+	private transient InputConstants.Key cachedEyeMeasurementKey = InputConstants.UNKNOWN;
 	private transient InputConstants.Key cachedEndarKey = InputConstants.UNKNOWN;
 	private transient InputConstants.Key cachedPiedarKey = InputConstants.UNKNOWN;
 	private transient InputConstants.Key cachedPreemptiveNavigationKey = InputConstants.UNKNOWN;
@@ -47,6 +51,19 @@ public final class ToolXConfig {
 		}
 
 		instance = loaded != null ? loaded : new ToolXConfig();
+		if (instance.eyeMeasurementKey == null || instance.eyeMeasurementKey.isBlank()) {
+			instance.eyeMeasurementKey = InputConstants.UNKNOWN.getName();
+		}
+		if (!Double.isFinite(instance.eyeMeasurementHudX)) {
+			instance.eyeMeasurementHudX = 0.0;
+		} else {
+			instance.eyeMeasurementHudX = Math.clamp(instance.eyeMeasurementHudX, 0.0, 1.0);
+		}
+		if (!Double.isFinite(instance.eyeMeasurementHudY)) {
+			instance.eyeMeasurementHudY = 0.5;
+		} else {
+			instance.eyeMeasurementHudY = Math.clamp(instance.eyeMeasurementHudY, 0.0, 1.0);
+		}
 		if (instance.endarKey == null || instance.endarKey.isBlank()) {
 			instance.endarKey = InputConstants.UNKNOWN.getName();
 		}
@@ -60,9 +77,20 @@ public final class ToolXConfig {
 	}
 
 	private void refreshCachedKeys() {
+		this.cachedEyeMeasurementKey = parseKey(this.eyeMeasurementKey);
 		this.cachedEndarKey = parseKey(this.endarKey);
 		this.cachedPiedarKey = parseKey(this.piedarKey);
 		this.cachedPreemptiveNavigationKey = parseKey(this.preemptiveNavigationKey);
+	}
+
+	public InputConstants.Key eyeMeasurementKey() {
+		return this.cachedEyeMeasurementKey != null ? this.cachedEyeMeasurementKey : InputConstants.UNKNOWN;
+	}
+
+	public void setEyeMeasurementKey(InputConstants.Key key) {
+		InputConstants.Key resolved = key != null ? key : InputConstants.UNKNOWN;
+		this.eyeMeasurementKey = resolved.getName();
+		this.cachedEyeMeasurementKey = resolved;
 	}
 
 	public InputConstants.Key endarKey() {

@@ -1,6 +1,7 @@
 package com.toolx.mixin;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.toolx.EyeMeasurementController;
 import com.toolx.PieChartController;
 import com.toolx.ToolXConfig;
 import net.minecraft.client.KeyboardHandler;
@@ -57,6 +58,22 @@ public abstract class KeyboardHandlerMixin {
 		cir.setReturnValue(true);
 	}
 
+	@Inject(method = "handleDebugKeys", at = @At("TAIL"))
+	private void toolx$handleEyeMeasurementDebugKeys(KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
+		if (!Boolean.TRUE.equals(cir.getReturnValue())) {
+			return;
+		}
+		if (event.key() == InputConstants.KEY_D) {
+			EyeMeasurementController.reset();
+			return;
+		}
+		if (event.key() == InputConstants.KEY_C
+			&& this.minecraft.player != null
+			&& !this.minecraft.player.isReducedDebugInfo()) {
+			EyeMeasurementController.onCopyLocation(this.minecraft);
+		}
+	}
+
 	@Inject(method = "keyPress", at = @At("TAIL"))
 	private void toolx$handleRadarKey(long handle, int action, KeyEvent event, CallbackInfo info) {
 		if (handle == 0L || handle != this.minecraft.getWindow().handle() || action != 1) {
@@ -65,6 +82,8 @@ public abstract class KeyboardHandlerMixin {
 		if (this.minecraft.options.keyDebugModifier.isDown()) {
 			return;
 		}
-		PieChartController.handleRadarKey(this.minecraft, InputConstants.getKey(event));
+		InputConstants.Key key = InputConstants.getKey(event);
+		PieChartController.handleRadarKey(this.minecraft, key);
+		EyeMeasurementController.handleMeasureKey(this.minecraft, key);
 	}
 }

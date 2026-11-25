@@ -72,7 +72,8 @@ public final class PieChartController {
 			return false;
 		}
 		ToolXConfig config = ToolXConfig.get();
-		return matchesDigit(config.endarKey(), digit)
+		return matchesDigit(config.eyeMeasurementKey(), digit)
+			|| matchesDigit(config.endarKey(), digit)
 			|| matchesDigit(config.piedarKey(), digit)
 			|| matchesDigit(config.preemptiveNavigationKey(), digit);
 	}
@@ -149,6 +150,8 @@ public final class PieChartController {
 		if (targetMode == null) {
 			return;
 		}
+
+		EyeMeasurementController.cancelMeasure();
 
 		if (activeRadarMode == targetMode) {
 			deactivateRadar(minecraft, true);
@@ -239,6 +242,12 @@ public final class PieChartController {
 			case PREEMPTIVE -> PREEMPTIVE_PIE_PATH;
 			case NONE -> "root";
 		};
+	}
+
+	public static void deactivateIfActive(@Nullable Minecraft minecraft) {
+		if (activeRadarMode != RadarMode.NONE) {
+			deactivateRadar(minecraft, true);
+		}
 	}
 
 	private static void deactivateRadar(@Nullable Minecraft minecraft, boolean restoreOverlayState) {

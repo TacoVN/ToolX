@@ -1,5 +1,6 @@
 package com.toolx.mixin;
 
+import com.toolx.EyeMeasurementController;
 import com.toolx.PieChartController;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -23,7 +24,9 @@ public abstract class MinecraftMixin {
 
 	@Inject(method = "tick", at = @At("TAIL"))
 	private void toolx$trackChunkChanges(CallbackInfo info) {
-		PieChartController.onClientTick((Minecraft) (Object) this);
+		Minecraft self = (Minecraft) (Object) this;
+		PieChartController.onClientTick(self);
+		EyeMeasurementController.onClientTick(self);
 	}
 
 	@Inject(method = "constructProfiler", at = @At("HEAD"))
@@ -40,10 +43,12 @@ public abstract class MinecraftMixin {
 	@Inject(method = "disconnect(Lnet/minecraft/client/gui/screens/Screen;ZZ)V", at = @At("HEAD"))
 	private void toolx$resetPieTrackingOnDisconnect(Screen screen, boolean keepResourcePacks, boolean stopSound, CallbackInfo info) {
 		PieChartController.resetTracking((Minecraft) (Object) this);
+		EyeMeasurementController.reset();
 	}
 
 	@Inject(method = "clearClientLevel(Lnet/minecraft/client/gui/screens/Screen;)V", at = @At("HEAD"))
 	private void toolx$resetPieTrackingOnClearLevel(Screen screen, CallbackInfo info) {
 		PieChartController.resetTracking((Minecraft) (Object) this);
+		EyeMeasurementController.reset();
 	}
 }

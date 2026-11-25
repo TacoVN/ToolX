@@ -3,10 +3,13 @@
 	"package": "com.toolx.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"CameraMixin",
+		"ChatScreenMixin",
 		"CreditsAndAttributionScreenMixin",
 		"DebugScreenEntryListAccessor",
 		"DebugScreenOverlayAccessor",
 		"GuiProfilerChartRendererMixin",
+		"HudMixin",
 		"KeyboardHandlerMixin",
 		"MinecraftMixin",
 		"MouseHandlerMixin",
