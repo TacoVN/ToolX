@@ -2,6 +2,7 @@ package com.toolx.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.toolx.PieChartController;
+import com.toolx.TimerController;
 import com.toolx.ToolXConfig;
 import java.util.List;
 import java.util.function.Consumer;
@@ -111,7 +112,13 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 	}
 
 	private void addMcsrSection(ToolXConfig config) {
-		this.addHeader("MCSR");
+		this.addToggleSection(
+			"MCSR",
+			createToggle("Timer", config.timer, value -> {
+				config.timer = value;
+				TimerController.onToggleChanged(value);
+			}, config)
+		);
 		this.toolXList.addKeyBind(
 			Component.literal("Eye Measurement"),
 			config::eyeMeasurementKey,

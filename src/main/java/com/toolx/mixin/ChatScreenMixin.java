@@ -2,6 +2,7 @@ package com.toolx.mixin;
 
 import com.toolx.gui.EyeMeasurementHud;
 import com.toolx.gui.ThinModeHud;
+import com.toolx.gui.TimerHud;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -16,7 +17,8 @@ public abstract class ChatScreenMixin {
 	@Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
 	private void toolx$onChatMouseClicked(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
 		if (ThinModeHud.onChatMouseClicked(event.x(), event.y(), event.button())
-			|| EyeMeasurementHud.onChatMouseClicked(event.x(), event.y(), event.button())) {
+			|| EyeMeasurementHud.onChatMouseClicked(event.x(), event.y(), event.button())
+			|| TimerHud.onChatMouseClicked(event.x(), event.y(), event.button())) {
 			cir.setReturnValue(true);
 		}
 	}
@@ -25,11 +27,13 @@ public abstract class ChatScreenMixin {
 	private void toolx$onChatRender(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a, CallbackInfo info) {
 		ThinModeHud.onChatRender(graphics, mouseX, mouseY);
 		EyeMeasurementHud.onChatRender(graphics, mouseX, mouseY);
+		TimerHud.onChatRender(mouseX, mouseY);
 	}
 
 	@Inject(method = "removed", at = @At("HEAD"))
 	private void toolx$onChatClosed(CallbackInfo info) {
 		ThinModeHud.endDrag();
 		EyeMeasurementHud.endDrag();
+		TimerHud.endDrag();
 	}
 }

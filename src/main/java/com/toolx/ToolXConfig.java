@@ -27,6 +27,9 @@ public final class ToolXConfig {
 	public String endarKey = InputConstants.UNKNOWN.getName();
 	public String piedarKey = InputConstants.UNKNOWN.getName();
 	public String preemptiveNavigationKey = InputConstants.UNKNOWN.getName();
+	public boolean timer = true;
+	public double timerHudX = 1.0;
+	public double timerHudY = 0.0;
 	public double thinECounterX = -1.0;
 	public double thinECounterY = -1.0;
 	public double thinPieChartX = -1.0;
@@ -84,6 +87,8 @@ public final class ToolXConfig {
 		instance.thinPieChartY = sanitizeOptionalAxis(instance.thinPieChartY);
 		instance.eyeZoomBoxX = sanitizeOptionalAxis(instance.eyeZoomBoxX);
 		instance.eyeZoomBoxY = sanitizeOptionalAxis(instance.eyeZoomBoxY);
+		instance.timerHudX = Double.isFinite(instance.timerHudX) ? Math.clamp(instance.timerHudX, 0.0, 1.0) : 1.0;
+		instance.timerHudY = Double.isFinite(instance.timerHudY) ? Math.clamp(instance.timerHudY, 0.0, 1.0) : 0.0;
 		instance.refreshCachedKeys();
 	}
 

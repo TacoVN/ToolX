@@ -306,6 +306,7 @@ public final class ThinModeHud {
 			boolean active = dragTarget == DragTarget.PIE
 				|| (dragTarget == DragTarget.NONE
 					&& !EyeMeasurementHud.isDragging()
+					&& !TimerHud.isDragging()
 					&& lastChatMouseX >= 0.0
 					&& isInside(lastChatMouseX, lastChatMouseY, pieX, pieY, pieW, pieH));
 			graphics.nextStratum();
@@ -380,6 +381,7 @@ public final class ThinModeHud {
 			boolean active = dragTarget == DragTarget.E_COUNTER
 				|| (dragTarget == DragTarget.NONE
 					&& !EyeMeasurementHud.isDragging()
+					&& !TimerHud.isDragging()
 					&& isInside(scaledMouseX, scaledMouseY, eX, eY, eW, eH));
 			graphics.pose().pushMatrix();
 			try {

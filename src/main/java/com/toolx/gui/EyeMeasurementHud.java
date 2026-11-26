@@ -567,12 +567,14 @@ public final class EyeMeasurementHud {
 				boolean zoomActive = dragTarget == DragTarget.EYE_ZOOM
 					|| (dragTarget == DragTarget.NONE
 						&& !ThinModeHud.isDragging()
+						&& !TimerHud.isDragging()
 						&& isInside(scaledMouseX, scaledMouseY, zoomX, zoomY, zoomW, zoomH));
 				graphics.outline(zoomX, zoomY, zoomW, zoomH, zoomActive ? HOVER_BORDER_COLOR : IDLE_CHAT_BORDER_COLOR);
 			}
 			if (visible && (dragTarget == DragTarget.HUD
 				|| (dragTarget == DragTarget.NONE
 					&& !ThinModeHud.isDragging()
+					&& !TimerHud.isDragging()
 					&& isInside(scaledMouseX, scaledMouseY, lastX, lastY, lastWidth, lastHeight)))) {
 				graphics.outline(lastX, lastY, lastWidth, lastHeight, HOVER_BORDER_COLOR);
 			}

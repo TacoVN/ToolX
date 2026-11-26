@@ -2,12 +2,19 @@ package com.toolx.mixin;
 
 import com.toolx.EyeMeasurementController;
 import com.toolx.PieChartController;
+import com.toolx.TimerController;
 import com.toolx.gui.StripTransition;
+import java.util.Optional;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.server.WorldStem;
+import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.util.profiling.ContinuousProfiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.util.profiling.SingleTickProfiler;
+import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.storage.LevelStorageSource;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -28,6 +35,31 @@ public abstract class MinecraftMixin {
 		Minecraft self = (Minecraft) (Object) this;
 		PieChartController.onClientTick(self);
 		EyeMeasurementController.onClientTick(self);
+		TimerController.onClientTick(self);
+	}
+
+	@Inject(
+		method = "doWorldLoad",
+		at = @At(
+			value = "INVOKE",
+			target = "Lnet/minecraft/client/Minecraft;disconnectWithProgressScreen()V",
+			shift = At.Shift.AFTER
+		)
+	)
+	private void toolx$prepareTimerOnSingleplayerWorldLoad(
+		LevelStorageSource.LevelStorageAccess levelSourceAccess,
+		PackRepository packRepository,
+		WorldStem worldStem,
+		Optional<GameRules> gameRules,
+		boolean newWorld,
+		CallbackInfo info
+	) {
+		TimerController.onSingleplayerWorldLoad(levelSourceAccess.getLevelId(), newWorld);
+	}
+
+	@Inject(method = "setLevel", at = @At("TAIL"))
+	private void toolx$armTimerOnClientLevelJoined(ClientLevel level, CallbackInfo info) {
+		TimerController.onClientLevelJoined((Minecraft) (Object) this);
 	}
 
 	@Inject(method = "constructProfiler", at = @At("HEAD"))
@@ -45,6 +77,7 @@ public abstract class MinecraftMixin {
 	private void toolx$resetPieTrackingOnDisconnect(Screen screen, boolean keepResourcePacks, boolean stopSound, CallbackInfo info) {
 		PieChartController.resetTracking((Minecraft) (Object) this);
 		EyeMeasurementController.reset();
+		TimerController.onDisconnect();
 		StripTransition.snapOff();
 	}
 
@@ -52,6 +85,7 @@ public abstract class MinecraftMixin {
 	private void toolx$resetPieTrackingOnClearLevel(Screen screen, CallbackInfo info) {
 		PieChartController.resetTracking((Minecraft) (Object) this);
 		EyeMeasurementController.reset();
+		TimerController.onDisconnect();
 		StripTransition.snapOff();
 	}
 }

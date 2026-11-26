@@ -3,8 +3,10 @@ package com.toolx.mixin;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.toolx.EyeMeasurementController;
 import com.toolx.PieChartController;
+import com.toolx.TimerController;
 import com.toolx.gui.EyeMeasurementHud;
 import com.toolx.gui.ThinModeHud;
+import com.toolx.gui.TimerHud;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.input.MouseButtonInfo;
@@ -29,6 +31,9 @@ public abstract class MouseHandlerMixin {
 
 	@Inject(method = "turnPlayer", at = @At("HEAD"))
 	private void toolx$scaleMouseDuringEyeMeasurement(double movementTime, CallbackInfo info) {
+		if (this.accumulatedDX != 0.0 || this.accumulatedDY != 0.0) {
+			TimerController.onFirstInput(this.minecraft);
+		}
 		if (EyeMeasurementController.isMeasuring()) {
 			this.accumulatedDX *= EyeMeasurementController.mouseYawScale(this.minecraft);
 			this.accumulatedDY *= EyeMeasurementController.mousePitchScale(this.minecraft);
@@ -43,9 +48,14 @@ public abstract class MouseHandlerMixin {
 		if (action == 0 && rawButtonInfo.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			ThinModeHud.endDrag();
 			EyeMeasurementHud.endDrag();
+			TimerHud.endDrag();
 			return;
 		}
-		if (action != 1 || this.minecraft.options.keyDebugModifier.isDown()) {
+		if (action != 1) {
+			return;
+		}
+		TimerController.onFirstInput(this.minecraft);
+		if (this.minecraft.options.keyDebugModifier.isDown()) {
 			return;
 		}
 		InputConstants.Key key = InputConstants.Type.MOUSE.getOrCreate(rawButtonInfo.button());

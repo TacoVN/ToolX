@@ -3,6 +3,7 @@ package com.toolx.mixin;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.toolx.EyeMeasurementController;
 import com.toolx.PieChartController;
+import com.toolx.TimerController;
 import com.toolx.ToolXConfig;
 import net.minecraft.client.KeyboardHandler;
 import net.minecraft.client.Minecraft;
@@ -14,6 +15,7 @@ import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -79,6 +81,9 @@ public abstract class KeyboardHandlerMixin {
 		if (handle == 0L || handle != this.minecraft.getWindow().handle() || action != 1) {
 			return;
 		}
+		if (!toolx$isNonGameplayKey(event.key())) {
+			TimerController.onFirstInput(this.minecraft);
+		}
 		if (this.minecraft.options.keyDebugModifier.isDown()) {
 			return;
 		}
@@ -86,5 +91,21 @@ public abstract class KeyboardHandlerMixin {
 		if (!PieChartController.handleRadarKey(this.minecraft, key)) {
 			EyeMeasurementController.handleMeasureKey(this.minecraft, key);
 		}
+	}
+
+	@Unique
+	private static boolean toolx$isNonGameplayKey(int key) {
+		return key == InputConstants.KEY_ESCAPE
+			|| key == InputConstants.KEY_F1
+			|| key == InputConstants.KEY_F2
+			|| key == InputConstants.KEY_F11
+			|| key == InputConstants.KEY_LALT
+			|| key == InputConstants.KEY_RALT
+			|| key == InputConstants.KEY_CAPSLOCK
+			|| key == InputConstants.KEY_LGUI
+			|| key == InputConstants.KEY_RGUI
+			|| key == InputConstants.KEY_PRINTSCREEN
+			|| key == InputConstants.KEY_NUMLOCK
+			|| key == InputConstants.KEY_SCROLLLOCK;
 	}
 }

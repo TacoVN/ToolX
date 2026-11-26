@@ -9,6 +9,7 @@ ToolX is a simple client-side utility mod for Vanilla Minecraft.
   - **Piedar:** Open the pie chart at `root.tick.blockEntities`, lock pie chart `0-9` navigation, enable chunk borders (`F3 + G`), and enable `Auto Reset`
   - **Preemptive Navigation:** Switch to MCSR Thin Mode (`340:1080`, `~300ms` smooth strip transition, auto-scaled clipped F3, draggable `E:` counter & borderless `2D` pie chart), open the pie chart at `root.frame.extract.level`, lock pie chart `0-9` navigation, enable chunk borders (`F3 + G`), and enable `Auto Reset`
 - **MCSR:**
+  - **Timer:** Real-time speedrun RTA display (`Any%`, `3 Decimals`, `First Input` start on New Worlds, idle `00:00.000` visible on Old Worlds, continuous fair RTA, stops on `WinScreen`, hidden in Options / Thin Mode / Eye Measurement, `2x` Debug GUI Scale outlined vanilla font without background, draggable in Chat, default top-right)
   - **Eye Measurement:** Toggleable dual-box aim mode (`340:1080` un-stretched `2.0°` vFOV center strip, `~300ms` smooth strip transition, draggable `15..1 | 1..15` magnified EyeZoom box, 1:1 mouse scaling, scaled centered hotbar, `F3 + Esc` support, locked independently from radar modes) paired with `F3 + C` 8-ring Stronghold triangulation, Boat Eye `1.40625°` detection, compact 1-row icon HUD synced with Debug GUI Scale (9-point snap dragging), and `F3 + D` reset
 
 ## Configuration
