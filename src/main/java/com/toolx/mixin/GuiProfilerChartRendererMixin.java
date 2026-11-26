@@ -1,7 +1,8 @@
 package com.toolx.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.toolx.ToolXConfig;
+import com.toolx.gui.ThinModeHud;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.render.pip.GuiProfilerChartRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
@@ -21,13 +22,13 @@ public abstract class GuiProfilerChartRendererMixin {
 	private static final float RADIUS_2D = 105.0F;
 
 	@Inject(method = "renderToTexture", at = @At("HEAD"), cancellable = true)
-	private void toolx$render2DChart(
+	private void toolx$render2DChartInThinMode(
 		GuiProfilerChartRenderState chartState,
 		PoseStack poseStack,
 		SubmitNodeCollector submitNodeCollector,
 		CallbackInfo info
 	) {
-		if (!ToolXConfig.get().pieChart2DMode) {
+		if (!ThinModeHud.shouldRenderThinLayout(Minecraft.getInstance())) {
 			return;
 		}
 

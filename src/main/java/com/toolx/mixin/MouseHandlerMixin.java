@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.toolx.EyeMeasurementController;
 import com.toolx.PieChartController;
 import com.toolx.gui.EyeMeasurementHud;
+import com.toolx.gui.ThinModeHud;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.input.MouseButtonInfo;
@@ -40,6 +41,7 @@ public abstract class MouseHandlerMixin {
 			return;
 		}
 		if (action == 0 && rawButtonInfo.button() == InputConstants.MOUSE_BUTTON_LEFT) {
+			ThinModeHud.endDrag();
 			EyeMeasurementHud.endDrag();
 			return;
 		}
@@ -47,7 +49,8 @@ public abstract class MouseHandlerMixin {
 			return;
 		}
 		InputConstants.Key key = InputConstants.Type.MOUSE.getOrCreate(rawButtonInfo.button());
-		PieChartController.handleRadarKey(this.minecraft, key);
-		EyeMeasurementController.handleMeasureKey(this.minecraft, key);
+		if (!PieChartController.handleRadarKey(this.minecraft, key)) {
+			EyeMeasurementController.handleMeasureKey(this.minecraft, key);
+		}
 	}
 }

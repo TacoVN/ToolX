@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.entity.vehicle.boat.AbstractBoat;
@@ -15,16 +16,16 @@ import net.minecraft.world.level.Level;
 import org.jspecify.annotations.Nullable;
 
 public final class EyeMeasurementController {
-	public static final float MEASURE_VFOV = 30.0F;
-	public static final float HORIZONTAL_STRETCH = 16.0F;
+	public static final float MEASURE_VFOV = 2.0F;
 
-	private static final double SIGMA_NORMAL_DEG = 0.03;
-	private static final double SIGMA_STRETCH_DEG = 0.008;
-	private static final double SIGMA_BOAT_DEG = 0.003;
+	private static final double SIGMA_NORMAL_DEG = 0.10;
+	private static final double SIGMA_STRETCH_DEG = 0.03;
+	private static final double SIGMA_BOAT_DEG = 0.005;
 	private static final double BOAT_GRID_STEP_DEG = 1.40625;
 	private static final double BOAT_GRID_TOLERANCE_DEG = 0.01;
 	private static final float MAX_MEASURE_PITCH_DEG = 31.0F;
 	private static final double BIOME_SNAP_CHUNKS = 7.0;
+	private static final double MAX_BIOME_SNAP_CHUNKS = 10.0;
 	private static final double SAME_SPOT_RADIUS_SQ = 2.0 * 2.0;
 	private static final double RESET_DISTANCE_SQ = 1500.0 * 1500.0;
 	private static final int MAX_RAYS = 8;
@@ -35,15 +36,13 @@ public final class EyeMeasurementController {
 	private static final int INTERSECTION_SEARCH_RADIUS = 6;
 	private static final int RADIAL_SAMPLES = 5;
 
-	private record StrongholdRing(int count, double rMid, double rMin, double rMax) {
+	private record StrongholdRing(int count, double rMin, double rMax) {
 	}
 
 	public record EyeRay(double startX, double startZ, double dirX, double dirZ, double sigmaDeg) {
 	}
 
 	public record Result(
-		int owChunkX,
-		int owChunkZ,
 		int owX,
 		int owZ,
 		int netherX,
@@ -57,14 +56,14 @@ public final class EyeMeasurementController {
 	}
 
 	private static final StrongholdRing[] RINGS = {
-		new StrongholdRing(3, 128.0, 88.0, 168.0),
-		new StrongholdRing(6, 320.0, 280.0, 360.0),
-		new StrongholdRing(10, 512.0, 472.0, 552.0),
-		new StrongholdRing(15, 704.0, 664.0, 744.0),
-		new StrongholdRing(21, 896.0, 856.0, 936.0),
-		new StrongholdRing(28, 1088.0, 1048.0, 1128.0),
-		new StrongholdRing(36, 1280.0, 1240.0, 1320.0),
-		new StrongholdRing(9, 1472.0, 1432.0, 1512.0)
+		new StrongholdRing(3, 88.0, 168.0),
+		new StrongholdRing(6, 280.0, 360.0),
+		new StrongholdRing(10, 472.0, 552.0),
+		new StrongholdRing(15, 664.0, 744.0),
+		new StrongholdRing(21, 856.0, 936.0),
+		new StrongholdRing(28, 1048.0, 1128.0),
+		new StrongholdRing(36, 1240.0, 1320.0),
+		new StrongholdRing(9, 1432.0, 1512.0)
 	};
 
 	private static boolean measuring;
@@ -84,11 +83,7 @@ public final class EyeMeasurementController {
 	}
 
 	public static double mouseYawScale(@Nullable Minecraft minecraft) {
-		return mousePitchScale(minecraft) / HORIZONTAL_STRETCH;
-	}
-
-	public static void cancelMeasure() {
-		measuring = false;
+		return mousePitchScale(minecraft);
 	}
 
 	public static void reset() {
@@ -111,7 +106,7 @@ public final class EyeMeasurementController {
 			|| minecraft.player == null
 			|| minecraft.gui == null
 			|| !Level.OVERWORLD.equals(minecraft.level.dimension())
-			|| !isAllowedScreen(minecraft.gui.screen())) {
+			|| !isAllowedWhileMeasuring(minecraft.gui.screen())) {
 			measuring = false;
 		}
 	}
@@ -133,7 +128,9 @@ public final class EyeMeasurementController {
 		}
 
 		if (!measuring) {
-			PieChartController.deactivateIfActive(minecraft);
+			if (PieChartController.isRadarActive()) {
+				return;
+			}
 			measuring = true;
 		} else {
 			measuring = false;
@@ -159,7 +156,9 @@ public final class EyeMeasurementController {
 		boolean usedStretch = measuring;
 		measuring = false;
 
-		boolean boatAligned = minecraft.player.getVehicle() instanceof AbstractBoat boat && isBoatGridAligned(boat.getYRot());
+		boolean boatAligned = usedStretch
+			&& minecraft.player.getVehicle() instanceof AbstractBoat boat
+			&& isBoatGridAligned(boat.getYRot());
 		double sigma = boatAligned ? SIGMA_BOAT_DEG : (usedStretch ? SIGMA_STRETCH_DEG : SIGMA_NORMAL_DEG);
 
 		double x = minecraft.player.getX();
@@ -172,6 +171,10 @@ public final class EyeMeasurementController {
 
 	private static boolean isAllowedScreen(@Nullable Screen screen) {
 		return screen == null || (screen instanceof PauseScreen pause && !pause.showsPauseMenu());
+	}
+
+	private static boolean isAllowedWhileMeasuring(@Nullable Screen screen) {
+		return isAllowedScreen(screen) || screen instanceof ChatScreen;
 	}
 
 	public static boolean isBoatGridAligned(double boatYawDeg) {
@@ -203,7 +206,14 @@ public final class EyeMeasurementController {
 		}
 
 		Result solved = solve(RECORDED_RAYS);
-		if (RECORDED_RAYS.size() >= 2 && (solved == null || solved.maxErrorDeg() > MAX_MULTI_RAY_ERROR_DEG)) {
+		double maxSigma = 0.0;
+		for (EyeRay ray : RECORDED_RAYS) {
+			if (ray.sigmaDeg() > maxSigma) {
+				maxSigma = ray.sigmaDeg();
+			}
+		}
+		double consistencyLimit = Math.min(MAX_MULTI_RAY_ERROR_DEG, Math.max(0.35, 8.0 * maxSigma));
+		if (RECORDED_RAYS.size() >= 2 && (solved == null || solved.maxErrorDeg() > consistencyLimit)) {
 			RECORDED_RAYS.clear();
 			RECORDED_RAYS.add(newRay);
 			solved = solve(RECORDED_RAYS);
@@ -219,30 +229,13 @@ public final class EyeMeasurementController {
 			return null;
 		}
 
-		boolean hasIntersection = false;
-		double intX = 0.0;
-		double intZ = 0.0;
-		if (rays.size() >= 2) {
-			AimPair pair = findBestIntersectingPair(rays);
-			if (pair != null) {
-				double bestDet = pair.det();
-				double dx = pair.b().startX() - pair.a().startX();
-				double dz = pair.b().startZ() - pair.a().startZ();
-				double tA = (dx * pair.b().dirZ() - dz * pair.b().dirX()) / bestDet;
-				double tB = (dx * pair.a().dirZ() - dz * pair.a().dirX()) / bestDet;
-				if (tA > 0.0 && tB > 0.0 && tA < 30000.0 && tB < 30000.0) {
-					hasIntersection = true;
-					intX = pair.a().startX() + tA * pair.a().dirX();
-					intZ = pair.a().startZ() + tA * pair.a().dirZ();
-				}
-			}
-		}
+		IntersectionPoint intersection = rays.size() >= 2 ? findBestIntersection(rays) : null;
 
 		Set<Long> candidateKeys = new HashSet<>();
 		collectRingConeCandidates(rays.getLast(), candidateKeys);
-		if (hasIntersection) {
-			int centerCx = (int) Math.round(intX / 16.0);
-			int centerCz = (int) Math.round(intZ / 16.0);
+		if (intersection != null) {
+			int centerCx = (int) Math.round(intersection.x() / 16.0);
+			int centerCz = (int) Math.round(intersection.z() / 16.0);
 			for (int dx = -INTERSECTION_SEARCH_RADIUS; dx <= INTERSECTION_SEARCH_RADIUS; dx++) {
 				for (int dz = -INTERSECTION_SEARCH_RADIUS; dz <= INTERSECTION_SEARCH_RADIUS; dz++) {
 					candidateKeys.add(packChunk(centerCx + dx, centerCz + dz));
@@ -290,6 +283,9 @@ public final class EyeMeasurementController {
 			}
 
 			double prior = computeChunkPrior(cx, cz, firstChunkX, firstChunkZ, firstOriginRadius);
+			if (prior <= 0.0) {
+				continue;
+			}
 			scores.add(new CandidateScore(cx, cz, Math.log(prior) + logLikelihood, maxErr));
 		}
 
@@ -314,8 +310,6 @@ public final class EyeMeasurementController {
 		int netherX = owChunkX * 2;
 		int netherZ = owChunkZ * 2;
 		return new Result(
-			owChunkX,
-			owChunkZ,
 			owX,
 			owZ,
 			netherX,
@@ -325,34 +319,34 @@ public final class EyeMeasurementController {
 		);
 	}
 
-	private record AimPair(EyeRay a, EyeRay b, double det) {
+	private record IntersectionPoint(double x, double z) {
 	}
 
-	private static @Nullable AimPair findBestIntersectingPair(List<EyeRay> rays) {
-		double bestDet = 0.0;
-		EyeRay bestA = null;
-		EyeRay bestB = null;
+	private static @Nullable IntersectionPoint findBestIntersection(List<EyeRay> rays) {
+		double bestAbsDet = 0.0;
+		double bestX = 0.0;
+		double bestZ = 0.0;
 		for (int i = 0; i < rays.size(); i++) {
 			EyeRay a = rays.get(i);
 			for (int j = i + 1; j < rays.size(); j++) {
 				EyeRay b = rays.get(j);
-				double det = a.dirZ() * b.dirX() - a.dirX() * b.dirZ();
+				double det = a.dirX() * b.dirZ() - a.dirZ() * b.dirX();
 				double absDet = Math.abs(det);
-				if (absDet < 1e-4) {
+				if (absDet < 1e-4 || absDet <= bestAbsDet) {
 					continue;
 				}
 				double dx = b.startX() - a.startX();
 				double dz = b.startZ() - a.startZ();
 				double tA = (dx * b.dirZ() - dz * b.dirX()) / det;
 				double tB = (dx * a.dirZ() - dz * a.dirX()) / det;
-				if (tA > 0.0 && tB > 0.0 && tA < 30000.0 && tB < 30000.0 && absDet > Math.abs(bestDet)) {
-					bestDet = det;
-					bestA = a;
-					bestB = b;
+				if (tA > 0.0 && tB > 0.0 && tA < 30000.0 && tB < 30000.0) {
+					bestAbsDet = absDet;
+					bestX = a.startX() + tA * a.dirX();
+					bestZ = a.startZ() + tA * a.dirZ();
 				}
 			}
 		}
-		return bestA != null ? new AimPair(bestA, bestB, bestDet) : null;
+		return bestAbsDet > 0.0 ? new IntersectionPoint(bestX, bestZ) : null;
 	}
 
 	private static void collectRingConeCandidates(EyeRay ray, Set<Long> outKeys) {
@@ -363,8 +357,8 @@ public final class EyeMeasurementController {
 		double perpZ = ray.dirX();
 
 		for (StrongholdRing ring : RINGS) {
-			double outerR = ring.rMax() + BIOME_SNAP_CHUNKS;
-			double innerR = Math.max(0.0, ring.rMin() - BIOME_SNAP_CHUNKS);
+			double outerR = ring.rMax() + MAX_BIOME_SNAP_CHUNKS;
+			double innerR = Math.max(0.0, ring.rMin() - MAX_BIOME_SNAP_CHUNKS);
 			double bDot = originX * ray.dirX() + originZ * ray.dirZ();
 			double cOuter = originX * originX + originZ * originZ - outerR * outerR;
 			double discOuter = bDot * bDot - cOuter;
@@ -438,6 +432,10 @@ public final class EyeMeasurementController {
 			}
 		}
 
+		if (totalRingDensity <= 0.0) {
+			return 0.0;
+		}
+
 		double distFromOrigin = Math.hypot(cx - originCx, cz - originCz);
 		double nearestSurvival = 1.0;
 		for (StrongholdRing ring : RINGS) {
@@ -481,13 +479,15 @@ public final class EyeMeasurementController {
 			return 1.0 / span;
 		}
 		double delta = r < ring.rMin() ? (ring.rMin() - r) : (r - ring.rMax());
+		if (delta > MAX_BIOME_SNAP_CHUNKS) {
+			return 0.0;
+		}
 		if (delta <= BIOME_SNAP_CHUNKS) {
 			double norm = delta / (BIOME_SNAP_CHUNKS * 0.4);
 			return (1.0 / span) * Math.exp(-0.5 * norm * norm) * 0.65;
 		}
-		double farSigma = BIOME_SNAP_CHUNKS * 0.6;
-		double tail = (1.0 / span) * Math.exp(-0.5 * Math.pow(delta / farSigma, 2.0)) * 0.1;
-		return Math.max(1e-9 / (1 + RADIAL_SAMPLES), tail);
+		double norm = delta / (BIOME_SNAP_CHUNKS * 0.45);
+		return (1.0 / span) * Math.exp(-0.5 * norm * norm) * 0.25;
 	}
 
 	private static double distSq(double ax, double az, double bx, double bz) {

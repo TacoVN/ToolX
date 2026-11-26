@@ -1,16 +1,19 @@
 package com.toolx;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.toolx.gui.StripTransition;
+import com.toolx.gui.ThinModeHud;
 import com.toolx.mixin.DebugScreenEntryListAccessor;
 import com.toolx.mixin.DebugScreenOverlayAccessor;
 import com.toolx.mixin.ProfilerPieChartAccessor;
+import com.toolx.mixin.SectionOcclusionGraphAccessor;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Options;
 import net.minecraft.client.gui.components.DebugScreenOverlay;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.gui.components.debug.DebugScreenEntryStatus;
 import net.minecraft.client.gui.components.debug.DebugScreenProfile;
+import net.minecraft.client.renderer.SectionOcclusionGraph;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Util;
@@ -21,7 +24,6 @@ import org.jspecify.annotations.Nullable;
 
 public final class PieChartController {
 	private static final long RESET_COOLDOWN_MS = 150L;
-	private static final int RADAR_FOV = 30;
 	private static final String ENDAR_PIE_PATH =
 		"root" + ProfileResults.PATH_SEPARATOR + "tick" + ProfileResults.PATH_SEPARATOR + "entities";
 	private static final String PIEDAR_PIE_PATH =
@@ -51,7 +53,7 @@ public final class PieChartController {
 	private static long lastResetTimeMs;
 
 	private static RadarMode activeRadarMode = RadarMode.NONE;
-	private static int savedFov = 70;
+	private static boolean lastThinCullingActive;
 	private static boolean savedAutoReset = true;
 	private static boolean savedOverlayVisible;
 	private static boolean savedRenderProfilerChart;
@@ -95,33 +97,35 @@ public final class PieChartController {
 		return activeRadarMode != RadarMode.NONE ? savedAutoReset : currentValue;
 	}
 
-	private static boolean isRadarFovActive() {
+	public static boolean isRadarActive() {
+		return activeRadarMode != RadarMode.NONE;
+	}
+
+	public static boolean isThinModeActive() {
 		return activeRadarMode == RadarMode.ENDAR || activeRadarMode == RadarMode.PREEMPTIVE;
 	}
 
-	public static boolean prepareOptionsSave(@Nullable Options options) {
-		if (!isRadarFovActive() || options == null) {
-			return false;
-		}
-		int currentFov = options.fov().get();
-		if (currentFov != RADAR_FOV) {
-			savedFov = currentFov;
-			return false;
-		}
-		if (savedFov == RADAR_FOV) {
-			return false;
-		}
-		options.fov().set(savedFov);
-		return true;
+	public static boolean isThinCullingActive(@Nullable Minecraft minecraft) {
+		return ThinModeHud.shouldRenderThinLayout(minecraft) && StripTransition.isSettled();
 	}
 
-	public static void finishOptionsSave(@Nullable Options options) {
-		if (options != null && isRadarFovActive()) {
-			options.fov().set(RADAR_FOV);
+	public static void syncThinCulling(@Nullable Minecraft minecraft) {
+		boolean thinCullingNow = isThinCullingActive(minecraft);
+		if (thinCullingNow != lastThinCullingActive) {
+			lastThinCullingActive = thinCullingNow;
+			refreshFrustum(minecraft);
 		}
 	}
 
-	public static void handleRadarKey(Minecraft minecraft, InputConstants.Key pressedKey) {
+	private static void refreshFrustum(@Nullable Minecraft minecraft) {
+		if (minecraft != null && minecraft.levelRenderer != null) {
+			SectionOcclusionGraph graph = minecraft.levelRenderer.sectionOcclusionGraph();
+			graph.invalidate();
+			((SectionOcclusionGraphAccessor) graph).toolx$getNeedsFrustumUpdate().set(true);
+		}
+	}
+
+	public static boolean handleRadarKey(Minecraft minecraft, InputConstants.Key pressedKey) {
 		if (minecraft == null
 			|| minecraft.level == null
 			|| minecraft.player == null
@@ -130,7 +134,7 @@ public final class PieChartController {
 			|| minecraft.gui.overlay() != null
 			|| minecraft.debugEntries == null
 			|| minecraft.getDebugOverlay() == null) {
-			return;
+			return false;
 		}
 
 		ToolXConfig config = ToolXConfig.get();
@@ -147,11 +151,9 @@ public final class PieChartController {
 			targetMode = RadarMode.PREEMPTIVE;
 		}
 
-		if (targetMode == null) {
-			return;
+		if (targetMode == null || EyeMeasurementController.isMeasuring()) {
+			return false;
 		}
-
-		EyeMeasurementController.cancelMeasure();
 
 		if (activeRadarMode == targetMode) {
 			deactivateRadar(minecraft, true);
@@ -161,7 +163,6 @@ public final class PieChartController {
 			Map<Identifier, DebugScreenEntryStatus> allStatuses = entriesAccessor.toolx$getAllStatuses();
 
 			if (activeRadarMode == RadarMode.NONE) {
-				savedFov = minecraft.options.fov().get();
 				savedAutoReset = config.pieChartAutoReset;
 				savedOverlayVisible = minecraft.debugEntries.isOverlayVisible();
 				savedRenderProfilerChart = ((DebugScreenOverlayAccessor) debugOverlay).toolx$isRenderProfilerChart();
@@ -174,12 +175,7 @@ public final class PieChartController {
 
 			boolean wasProfilerChartVisible = debugOverlay.showProfilerChart();
 			activeRadarMode = targetMode;
-
-			if (targetMode == RadarMode.ENDAR || targetMode == RadarMode.PREEMPTIVE) {
-				minecraft.options.fov().set(RADAR_FOV);
-			} else {
-				minecraft.options.fov().set(savedFov);
-			}
+			syncThinCulling(minecraft);
 
 			config.pieChartAutoReset = true;
 
@@ -215,6 +211,7 @@ public final class PieChartController {
 				}
 			}
 		}
+		return true;
 	}
 
 	private static boolean restoreChunkBorders(
@@ -244,14 +241,10 @@ public final class PieChartController {
 		};
 	}
 
-	public static void deactivateIfActive(@Nullable Minecraft minecraft) {
-		if (activeRadarMode != RadarMode.NONE) {
-			deactivateRadar(minecraft, true);
-		}
-	}
-
 	private static void deactivateRadar(@Nullable Minecraft minecraft, boolean restoreOverlayState) {
 		activeRadarMode = RadarMode.NONE;
+		ThinModeHud.resetState();
+		syncThinCulling(minecraft);
 		ToolXConfig.get().pieChartAutoReset = savedAutoReset;
 		if (!savedAutoReset) {
 			hasLastChunk = false;
@@ -261,10 +254,6 @@ public final class PieChartController {
 		}
 		if (minecraft == null) {
 			return;
-		}
-
-		if (minecraft.options != null) {
-			minecraft.options.fov().set(savedFov);
 		}
 
 		boolean overlayVisible = minecraft.debugEntries != null && minecraft.debugEntries.isOverlayVisible();
@@ -300,6 +289,8 @@ public final class PieChartController {
 				deactivateRadar(minecraft, false);
 			}
 		}
+
+		syncThinCulling(minecraft);
 
 		if (!ToolXConfig.get().pieChartAutoReset) {
 			hasLastChunk = false;
@@ -348,6 +339,8 @@ public final class PieChartController {
 	public static void resetTracking(@Nullable Minecraft minecraft) {
 		if (activeRadarMode != RadarMode.NONE) {
 			deactivateRadar(minecraft, true);
+		} else {
+			ThinModeHud.resetState();
 		}
 		hasLastChunk = false;
 		lastDimension = null;

@@ -63,11 +63,11 @@ public abstract class KeyboardHandlerMixin {
 		if (!Boolean.TRUE.equals(cir.getReturnValue())) {
 			return;
 		}
-		if (event.key() == InputConstants.KEY_D) {
+		if (this.minecraft.options.keyDebugClearChat.matches(event)) {
 			EyeMeasurementController.reset();
 			return;
 		}
-		if (event.key() == InputConstants.KEY_C
+		if (this.minecraft.options.keyDebugCopyLocation.matches(event)
 			&& this.minecraft.player != null
 			&& !this.minecraft.player.isReducedDebugInfo()) {
 			EyeMeasurementController.onCopyLocation(this.minecraft);
@@ -83,7 +83,8 @@ public abstract class KeyboardHandlerMixin {
 			return;
 		}
 		InputConstants.Key key = InputConstants.getKey(event);
-		PieChartController.handleRadarKey(this.minecraft, key);
-		EyeMeasurementController.handleMeasureKey(this.minecraft, key);
+		if (!PieChartController.handleRadarKey(this.minecraft, key)) {
+			EyeMeasurementController.handleMeasureKey(this.minecraft, key);
+		}
 	}
 }

@@ -58,7 +58,6 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 	private void addPieChartSection(ToolXConfig config) {
 		this.addToggleSection(
 			"Pie Chart",
-			createToggle("2D Mode", config.pieChart2DMode, value -> config.pieChart2DMode = value, config),
 			createToggle("Auto Reset", config.pieChartAutoReset, value -> {
 				config.pieChartAutoReset = value;
 				PieChartController.syncSavedAutoReset(value);

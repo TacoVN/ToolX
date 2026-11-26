@@ -8,14 +8,17 @@
 		"CreditsAndAttributionScreenMixin",
 		"DebugScreenEntryListAccessor",
 		"DebugScreenOverlayAccessor",
+		"DebugScreenOverlayMixin",
+		"GameRendererMixin",
+		"GuiGraphicsExtractorInvoker",
 		"GuiProfilerChartRendererMixin",
 		"HudMixin",
 		"KeyboardHandlerMixin",
 		"MinecraftMixin",
 		"MouseHandlerMixin",
-		"OptionsMixin",
 		"ProfilerPieChartAccessor",
-		"ProfilerPieChartMixin"
+		"ProfilerPieChartMixin",
+		"SectionOcclusionGraphAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

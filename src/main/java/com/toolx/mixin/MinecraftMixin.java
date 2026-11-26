@@ -2,6 +2,7 @@ package com.toolx.mixin;
 
 import com.toolx.EyeMeasurementController;
 import com.toolx.PieChartController;
+import com.toolx.gui.StripTransition;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.util.profiling.ContinuousProfiler;
@@ -44,11 +45,13 @@ public abstract class MinecraftMixin {
 	private void toolx$resetPieTrackingOnDisconnect(Screen screen, boolean keepResourcePacks, boolean stopSound, CallbackInfo info) {
 		PieChartController.resetTracking((Minecraft) (Object) this);
 		EyeMeasurementController.reset();
+		StripTransition.snapOff();
 	}
 
 	@Inject(method = "clearClientLevel(Lnet/minecraft/client/gui/screens/Screen;)V", at = @At("HEAD"))
 	private void toolx$resetPieTrackingOnClearLevel(Screen screen, CallbackInfo info) {
 		PieChartController.resetTracking((Minecraft) (Object) this);
 		EyeMeasurementController.reset();
+		StripTransition.snapOff();
 	}
 }

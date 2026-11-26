@@ -1,15 +1,28 @@
 package com.toolx.gui;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.device.GpuDevice;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuSampler;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.toolx.EyeMeasurementController;
 import com.toolx.EyeMeasurementController.Result;
 import com.toolx.ToolXConfig;
+import com.toolx.mixin.GuiGraphicsExtractorInvoker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Hud;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -21,6 +34,10 @@ import net.minecraft.world.level.Level;
 import org.jspecify.annotations.Nullable;
 
 public final class EyeMeasurementHud {
+	private static final int EYE_ZOOM_COLS = 30;
+	private static final float EYE_ZOOM_CROP_STRIP_FRAC = 0.80F;
+	private static final float EYE_ZOOM_CROP_HEIGHT_FRAC = 0.40F;
+
 	private static final int MARGIN = 4;
 	private static final int PADDING_X = 3;
 	private static final int PADDING_Y = 3;
@@ -31,38 +48,64 @@ public final class EyeMeasurementHud {
 	private static final int COL_GAP = 10;
 	private static final double SNAP_THRESHOLD = 6.0;
 
-	private static final int HOVER_BORDER_COLOR = 0xCCFFFFFF;
+	private static final int IDLE_CHAT_BORDER_COLOR = 0x66FFFFFF;
+	private static final int HOVER_BORDER_COLOR = 0xEEFFFFFF;
 	private static final int TEXT_BASE_COLOR = 0xFFFFFFFF;
 	private static final int CROSSHAIR_INVERT_COLOR = 0xFFFFFFFF;
-	private static final int CROSSHAIR_TIP_COLOR = 0xFFFF3B3B;
+	private static final int ZOOM_RULER_BG = 0x90000000;
+	private static final int ZOOM_RULER_TICK_COLOR = 0x55FFFFFF;
+	private static final int ZOOM_CENTER_LINE = 0xFFFFFFFF;
 
 	private static final int COLOR_GREEN = 0x1FFF1F;
 	private static final int COLOR_RED = 0xFF0B0B;
 	private static final int COLOR_YELLOW = 0xFFDE21;
 
-	private static final int CENTER_GAP_HALF = 3;
-	private static final double RULER_MAX_DEG = 0.20;
-	private static final double RULER_STEP_DEG = 0.05;
+	private static final int CENTER_CROSSHAIR_HALF = 4;
 	private static final Identifier ENDER_EYE_TEXTURE = Identifier.withDefaultNamespace("textures/item/ender_eye.png");
+
+	private enum DragTarget {
+		NONE,
+		HUD,
+		EYE_ZOOM
+	}
 
 	private static @Nullable ItemStack grassIcon;
 	private static @Nullable ItemStack netherrackIcon;
 	private static @Nullable Identifier speedSprite;
+
+	private static @Nullable GpuTexture eyeZoomTexture;
+	private static @Nullable GpuTextureView eyeZoomTextureView;
+	private static @Nullable GpuFormat eyeZoomFormat;
+	private static int eyeZoomTexW;
+	private static int eyeZoomTexH;
 
 	private static boolean visible;
 	private static int lastX;
 	private static int lastY;
 	private static int lastWidth;
 	private static int lastHeight;
+
+	private static boolean zoomVisible;
+	private static int zoomX;
+	private static int zoomY;
+	private static int zoomW;
+	private static int zoomH;
+
 	private static int lastGuiWidth;
 	private static int lastGuiHeight;
+	private static int lastStripLeft;
+	private static int lastStripRight;
 	private static float lastScale = 1.0F;
 
-	private static boolean dragging;
+	private static DragTarget dragTarget = DragTarget.NONE;
 	private static double dragOffsetX;
 	private static double dragOffsetY;
 
 	private EyeMeasurementHud() {
+	}
+
+	public static boolean isDragging() {
+		return dragTarget != DragTarget.NONE;
 	}
 
 	private static void ensureIcons() {
@@ -71,6 +114,95 @@ public final class EyeMeasurementHud {
 			netherrackIcon = new ItemStack(Items.NETHERRACK);
 			speedSprite = Hud.getMobEffectSprite(MobEffects.SPEED);
 		}
+	}
+
+	public static boolean shouldRenderMeasureLayout(@Nullable Minecraft minecraft) {
+		if (!EyeMeasurementController.isMeasuring()
+			|| minecraft == null
+			|| minecraft.level == null
+			|| minecraft.player == null
+			|| minecraft.getWindow() == null
+			|| minecraft.gui == null
+			|| !Level.OVERWORLD.equals(minecraft.level.dimension())) {
+			return false;
+		}
+		Screen screen = minecraft.gui.screen();
+		if (screen != null
+			&& !(screen instanceof ChatScreen)
+			&& !(screen instanceof PauseScreen pause && !pause.showsPauseMenu())) {
+			return false;
+		}
+		if (minecraft.gui.hud != null && minecraft.gui.hud.isHidden()) {
+			return false;
+		}
+		Window window = minecraft.getWindow();
+		int physW = window.getWidth();
+		int physH = window.getHeight();
+		return physW > 0 && physH > 0 && Math.round(physH * ThinModeHud.THIN_ASPECT) < physW;
+	}
+
+	public static void captureEyeZoomFrame(@Nullable Minecraft minecraft) {
+		if (!EyeMeasurementController.isMeasuring()) {
+			if (eyeZoomTexture != null || eyeZoomTextureView != null) {
+				closeZoomResources();
+			}
+			return;
+		}
+		if (!shouldRenderMeasureLayout(minecraft)) {
+			return;
+		}
+		RenderTarget mainTarget = minecraft.gameRenderer != null ? minecraft.gameRenderer.mainRenderTarget() : null;
+		GpuTexture src = mainTarget != null ? mainTarget.getColorTexture() : null;
+		if (src == null || src.isClosed()) {
+			return;
+		}
+		int srcW = src.getWidth(0);
+		int srcH = src.getHeight(0);
+		if (srcW <= 0 || srcH <= 0) {
+			return;
+		}
+
+		GpuFormat format = src.getFormat();
+		if (eyeZoomTexture == null
+			|| eyeZoomTexture.isClosed()
+			|| eyeZoomTextureView == null
+			|| !format.equals(eyeZoomFormat)
+			|| eyeZoomTexW != srcW
+			|| eyeZoomTexH != srcH) {
+			closeZoomResources();
+			GpuDevice device = RenderSystem.getDevice();
+			eyeZoomTexture = device.createTexture(
+				"toolx_eye_zoom",
+				GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING,
+				format,
+				srcW,
+				srcH,
+				1,
+				1
+			);
+			eyeZoomTextureView = device.createTextureView(eyeZoomTexture);
+			eyeZoomFormat = format;
+			eyeZoomTexW = srcW;
+			eyeZoomTexH = srcH;
+		}
+
+		// Copy full framebuffer with zero offsets to avoid GlCommandEncoder's srcX1/srcY1 blit bug, then crop center via UVs.
+		CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
+		encoder.copyTextureToTexture(src, eyeZoomTexture, 0, 0, 0, 0, 0, srcW, srcH);
+	}
+
+	public static void closeZoomResources() {
+		if (eyeZoomTextureView != null) {
+			eyeZoomTextureView.close();
+			eyeZoomTextureView = null;
+		}
+		if (eyeZoomTexture != null) {
+			eyeZoomTexture.close();
+			eyeZoomTexture = null;
+		}
+		eyeZoomFormat = null;
+		eyeZoomTexW = 0;
+		eyeZoomTexH = 0;
 	}
 
 	public static void extractRenderState(@Nullable Minecraft minecraft, GuiGraphicsExtractor graphics) {
@@ -82,34 +214,75 @@ public final class EyeMeasurementHud {
 			|| minecraft.gui == null
 			|| minecraft.gui.hud == null) {
 			visible = false;
-			dragging = false;
+			zoomVisible = false;
+			dragTarget = DragTarget.NONE;
 			return;
 		}
 
 		if (minecraft.gui.hud.isHidden() && minecraft.gui.screen() == null) {
 			visible = false;
-			dragging = false;
+			zoomVisible = false;
+			dragTarget = DragTarget.NONE;
 			return;
 		}
 
 		ResourceKey<Level> dimension = minecraft.level.dimension();
 		boolean inOverworld = Level.OVERWORLD.equals(dimension);
 		boolean inNether = Level.NETHER.equals(dimension);
-
-		if (EyeMeasurementController.isMeasuring() && inOverworld) {
-			extractMeasureCrosshair(minecraft.getWindow(), graphics);
-		}
-
 		if (!inOverworld && !inNether) {
 			visible = false;
-			dragging = false;
+			zoomVisible = false;
+			dragTarget = DragTarget.NONE;
 			return;
+		}
+
+		Window window = minecraft.getWindow();
+		int guiScale = Math.max(1, window.getGuiScale());
+		int rawDebugScale = minecraft.options.debugGuiScale().get();
+		int debugScale;
+		if (rawDebugScale == Options.DEBUG_GUI_SCALE_UNCHANGED) {
+			debugScale = guiScale;
+		} else if (rawDebugScale == Options.AUTO_GUI_SCALE) {
+			debugScale = window.calculateScale(0, minecraft.isEnforceUnicode()) / 2;
+		} else {
+			debugScale = window.calculateScale(rawDebugScale, minecraft.isEnforceUnicode());
+		}
+
+		boolean scaled = debugScale < guiScale && debugScale > 0;
+		float scale = scaled ? (float) debugScale / (float) guiScale : 1.0F;
+		int guiWidth = scaled ? Math.max(1, window.getWidth() / debugScale) : Math.max(1, graphics.guiWidth());
+		int guiHeight = scaled ? Math.max(1, window.getHeight() / debugScale) : Math.max(1, graphics.guiHeight());
+
+		int physW = Math.max(1, window.getWidth());
+		int physH = Math.max(1, window.getHeight());
+		int physThinW = Math.round(physH * ThinModeHud.THIN_ASPECT);
+		int physLeftBarW = Math.max(0, (physW - physThinW) / 2);
+		int physRightBarX = Math.min(physW, physLeftBarW + physThinW);
+		int stripLeft = Math.round((float) physLeftBarW * guiWidth / (float) physW);
+		int stripRight = Math.round((float) physRightBarX * guiWidth / (float) physW);
+
+		lastGuiWidth = guiWidth;
+		lastGuiHeight = guiHeight;
+		lastStripLeft = stripLeft;
+		lastStripRight = stripRight;
+		lastScale = scale;
+
+		if (shouldRenderMeasureLayout(minecraft)) {
+			extractMeasureCrosshair(window, graphics);
+			extractEyeZoomBox(minecraft, graphics, guiWidth, guiHeight, stripLeft, scale, scaled);
+		} else {
+			zoomVisible = false;
+			if (dragTarget == DragTarget.EYE_ZOOM) {
+				dragTarget = DragTarget.NONE;
+			}
 		}
 
 		Result result = EyeMeasurementController.lastResult();
 		if (result == null) {
 			visible = false;
-			dragging = false;
+			if (dragTarget == DragTarget.HUD) {
+				dragTarget = DragTarget.NONE;
+			}
 			return;
 		}
 
@@ -145,23 +318,6 @@ public final class EyeMeasurementHud {
 
 		int width = PADDING_X * 2 + totalColsWidth + COL_GAP * (colTexts.length - 1);
 		int height = PADDING_Y * 2 + ICON_SIZE + ICON_TEXT_GAP + TEXT_HEIGHT;
-
-		Window window = minecraft.getWindow();
-		int guiScale = Math.max(1, window.getGuiScale());
-		int rawDebugScale = minecraft.options.debugGuiScale().get();
-		int debugScale;
-		if (rawDebugScale == Options.DEBUG_GUI_SCALE_UNCHANGED) {
-			debugScale = guiScale;
-		} else if (rawDebugScale == Options.AUTO_GUI_SCALE) {
-			debugScale = window.calculateScale(0, minecraft.isEnforceUnicode()) / 2;
-		} else {
-			debugScale = window.calculateScale(rawDebugScale, minecraft.isEnforceUnicode());
-		}
-
-		boolean scaled = debugScale < guiScale && debugScale > 0;
-		float scale = scaled ? (float) debugScale / (float) guiScale : 1.0F;
-		int guiWidth = scaled ? window.getWidth() / debugScale : graphics.guiWidth();
-		int guiHeight = scaled ? window.getHeight() / debugScale : graphics.guiHeight();
 		int minX = MARGIN;
 		int minY = MARGIN;
 		int maxX = Math.max(minX, guiWidth - width - MARGIN);
@@ -177,9 +333,6 @@ public final class EyeMeasurementHud {
 		lastY = boxY;
 		lastWidth = width;
 		lastHeight = height;
-		lastGuiWidth = guiWidth;
-		lastGuiHeight = guiHeight;
-		lastScale = scale;
 		visible = true;
 
 		graphics.pose().pushMatrix();
@@ -214,46 +367,137 @@ public final class EyeMeasurementHud {
 		}
 	}
 
+	private static void extractEyeZoomBox(
+		Minecraft minecraft,
+		GuiGraphicsExtractor graphics,
+		int guiWidth,
+		int guiHeight,
+		int stripLeft,
+		float scale,
+		boolean scaled
+	) {
+		if (eyeZoomTextureView == null
+			|| eyeZoomTexture == null
+			|| eyeZoomTexture.isClosed()
+			|| eyeZoomTexW <= 0
+			|| eyeZoomTexH <= 0) {
+			zoomVisible = false;
+			if (dragTarget == DragTarget.EYE_ZOOM) {
+				dragTarget = DragTarget.NONE;
+			}
+			return;
+		}
+
+		int availLeft = Math.max(0, stripLeft - MARGIN);
+		int colW = Math.max(6, Math.min(20, availLeft / EYE_ZOOM_COLS));
+		int boxW = colW * EYE_ZOOM_COLS;
+		int boxH = Math.max(40, Math.round(boxW * 0.42F));
+
+		int minX = 0;
+		int minY = 0;
+		int maxX = Math.max(minX, guiWidth - boxW);
+		int maxY = Math.max(minY, guiHeight - boxH);
+
+		ToolXConfig config = ToolXConfig.get();
+		int boxX = config.eyeZoomBoxX < 0.0
+			? minX
+			: (int) Math.round(minX + Math.clamp(config.eyeZoomBoxX, 0.0, 1.0) * (maxX - minX));
+		int boxY = config.eyeZoomBoxY < 0.0
+			? minY
+			: (int) Math.round(minY + Math.clamp(config.eyeZoomBoxY, 0.0, 1.0) * (maxY - minY));
+
+		zoomVisible = true;
+		zoomX = boxX;
+		zoomY = boxY;
+		zoomW = boxW;
+		zoomH = boxH;
+
+		float cropW = Math.min((float) eyeZoomTexW, Math.round(eyeZoomTexH * ThinModeHud.THIN_ASPECT * EYE_ZOOM_CROP_STRIP_FRAC));
+		float cropH = Math.min((float) eyeZoomTexH, Math.round(eyeZoomTexH * EYE_ZOOM_CROP_HEIGHT_FRAC));
+		float u0 = ((float) eyeZoomTexW - cropW) * 0.5F / (float) eyeZoomTexW;
+		float u1 = ((float) eyeZoomTexW + cropW) * 0.5F / (float) eyeZoomTexW;
+		float vTop = 0.5F + (cropH * 0.5F) / (float) eyeZoomTexH;
+		float vBottom = 0.5F - (cropH * 0.5F) / (float) eyeZoomTexH;
+
+		GpuSampler sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
+		int midY = boxY + boxH / 2;
+		int centerLineX = boxX + (EYE_ZOOM_COLS / 2) * colW;
+		float slideX = StripTransition.horizontalSlideOffset(boxX, boxW, guiWidth);
+
+		graphics.pose().pushMatrix();
+		try {
+			if (scaled) {
+				graphics.pose().scale(scale, scale);
+			}
+			if (slideX != 0.0F) {
+				graphics.pose().translate(slideX, 0.0F);
+			}
+
+			((GuiGraphicsExtractorInvoker) graphics).toolx$innerBlit(
+				RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND,
+				eyeZoomTextureView,
+				sampler,
+				boxX,
+				boxY,
+				boxX + boxW,
+				boxY + boxH,
+				u0,
+				u1,
+				vTop,
+				vBottom,
+				0xFFFFFFFF
+			);
+
+			Font font = minecraft.font;
+			int twoDigitWidth = Math.max(1, font.width("15") - 1);
+			float textScale = Math.min(0.85F, Math.max(0.30F, (colW - 3.5F) / (float) twoDigitWidth));
+			int bandHalf = Math.max(4, Math.round(4.5F * textScale) + 2);
+
+			graphics.fill(boxX, midY - bandHalf, boxX + boxW, midY + bandHalf, ZOOM_RULER_BG);
+			for (int i = 1; i < EYE_ZOOM_COLS; i++) {
+				if (i == EYE_ZOOM_COLS / 2) {
+					continue;
+				}
+				int tickX = boxX + i * colW;
+				graphics.fill(tickX, midY + bandHalf - 2, tickX + 1, midY + bandHalf, ZOOM_RULER_TICK_COLOR);
+			}
+			graphics.fill(centerLineX, boxY, centerLineX + 1, boxY + boxH, ZOOM_CENTER_LINE);
+
+			int halfCols = EYE_ZOOM_COLS / 2;
+			for (int i = 0; i < EYE_ZOOM_COLS; i++) {
+				int number = i < halfCols ? (halfCols - i) : (i - halfCols + 1);
+				String label = Integer.toString(number);
+				int visualW = Math.max(1, font.width(label) - 1);
+				float colCenterX = boxX + (i + 0.5F) * colW;
+				float drawX = colCenterX - (visualW * textScale) * 0.5F;
+				float drawY = midY - (7.0F * textScale) * 0.5F;
+
+				graphics.pose().pushMatrix();
+				graphics.pose().translate(drawX, drawY);
+				if (textScale != 1.0F) {
+					graphics.pose().scale(textScale, textScale);
+				}
+				graphics.text(font, label, 0, 0, TEXT_BASE_COLOR);
+				graphics.pose().popMatrix();
+			}
+		} finally {
+			graphics.pose().popMatrix();
+		}
+	}
+
 	private static void extractMeasureCrosshair(Window window, GuiGraphicsExtractor graphics) {
 		int guiScale = Math.max(1, window.getGuiScale());
 		float invScale = 1.0F / (float) guiScale;
-		int physW = window.getWidth();
-		int physH = window.getHeight();
-		int cx = physW / 2;
-		int cy = physH / 2;
-
-		double halfFovRad = Math.toRadians(EyeMeasurementController.MEASURE_VFOV * 0.5);
-		double pxPerRad = (physH * 0.5) * EyeMeasurementController.HORIZONTAL_STRETCH / Math.tan(halfFovRad);
-		int maxReachX = (int) Math.round(Math.tan(Math.toRadians(RULER_MAX_DEG)) * pxPerRad);
-		maxReachX = Math.clamp(maxReachX, 24, Math.max(24, cx - 8));
-		int halfSpanY = Math.clamp(physH / 3, 40, Math.max(40, cy - 12));
+		int cx = window.getWidth() / 2;
+		int cy = window.getHeight() / 2;
 
 		graphics.pose().pushMatrix();
 		try {
 			if (guiScale != 1) {
 				graphics.pose().scale(invScale, invScale);
 			}
-
-			graphics.fill(RenderPipelines.GUI_INVERT, cx, cy - halfSpanY, cx + 1, cy - CENTER_GAP_HALF, CROSSHAIR_INVERT_COLOR);
-			graphics.fill(RenderPipelines.GUI_INVERT, cx, cy + CENTER_GAP_HALF + 1, cx + 1, cy + halfSpanY + 1, CROSSHAIR_INVERT_COLOR);
-
-			int tipLen = Math.min(14, Math.max(6, halfSpanY / 6));
-			graphics.fill(cx, cy - halfSpanY, cx + 1, cy - halfSpanY + tipLen, CROSSHAIR_TIP_COLOR);
-			graphics.fill(cx, cy + halfSpanY + 1 - tipLen, cx + 1, cy + halfSpanY + 1, CROSSHAIR_TIP_COLOR);
-
-			graphics.fill(RenderPipelines.GUI_INVERT, cx - maxReachX, cy, cx - CENTER_GAP_HALF, cy + 1, CROSSHAIR_INVERT_COLOR);
-			graphics.fill(RenderPipelines.GUI_INVERT, cx + CENTER_GAP_HALF + 1, cy, cx + maxReachX + 1, cy + 1, CROSSHAIR_INVERT_COLOR);
-
-			int stepCount = (int) Math.round(RULER_MAX_DEG / RULER_STEP_DEG);
-			for (int i = 1; i <= stepCount; i++) {
-				int dx = (int) Math.round(Math.tan(Math.toRadians(i * RULER_STEP_DEG)) * pxPerRad);
-				if (dx <= CENTER_GAP_HALF + 2 || dx > maxReachX) {
-					continue;
-				}
-				int halfTick = (i % 2 == 0) ? 6 : 3;
-				graphics.fill(RenderPipelines.GUI_INVERT, cx - dx, cy - halfTick, cx - dx + 1, cy + halfTick + 1, CROSSHAIR_INVERT_COLOR);
-				graphics.fill(RenderPipelines.GUI_INVERT, cx + dx, cy - halfTick, cx + dx + 1, cy + halfTick + 1, CROSSHAIR_INVERT_COLOR);
-			}
+			graphics.fill(RenderPipelines.GUI_INVERT, cx, cy - CENTER_CROSSHAIR_HALF, cx + 1, cy + CENTER_CROSSHAIR_HALF + 1, CROSSHAIR_INVERT_COLOR);
+			graphics.fill(RenderPipelines.GUI_INVERT, cx - CENTER_CROSSHAIR_HALF, cy, cx + CENTER_CROSSHAIR_HALF + 1, cy + 1, CROSSHAIR_INVERT_COLOR);
 		} finally {
 			graphics.pose().popMatrix();
 		}
@@ -263,22 +507,34 @@ public final class EyeMeasurementHud {
 		double safeScale = lastScale > 0.0F ? lastScale : 1.0F;
 		double scaledMouseX = mouseX / safeScale;
 		double scaledMouseY = mouseY / safeScale;
-		if (!visible || !isInsideBox(scaledMouseX, scaledMouseY)) {
+
+		DragTarget hit = DragTarget.NONE;
+		if (zoomVisible && isInside(scaledMouseX, scaledMouseY, zoomX, zoomY, zoomW, zoomH)) {
+			hit = DragTarget.EYE_ZOOM;
+		} else if (visible && isInside(scaledMouseX, scaledMouseY, lastX, lastY, lastWidth, lastHeight)) {
+			hit = DragTarget.HUD;
+		}
+		if (hit == DragTarget.NONE) {
 			return false;
 		}
 
 		if (button == InputConstants.MOUSE_BUTTON_LEFT) {
-			dragging = true;
-			dragOffsetX = scaledMouseX - lastX;
-			dragOffsetY = scaledMouseY - lastY;
+			dragTarget = hit;
+			dragOffsetX = scaledMouseX - (hit == DragTarget.EYE_ZOOM ? zoomX : lastX);
+			dragOffsetY = scaledMouseY - (hit == DragTarget.EYE_ZOOM ? zoomY : lastY);
 			return true;
 		}
 
 		if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
-			dragging = false;
+			dragTarget = DragTarget.NONE;
 			ToolXConfig config = ToolXConfig.get();
-			config.eyeMeasurementHudX = 0.0;
-			config.eyeMeasurementHudY = 0.5;
+			if (hit == DragTarget.EYE_ZOOM) {
+				config.eyeZoomBoxX = -1.0;
+				config.eyeZoomBoxY = -1.0;
+			} else {
+				config.eyeMeasurementHudX = 0.0;
+				config.eyeMeasurementHudY = 0.5;
+			}
 			config.save();
 			return true;
 		}
@@ -287,8 +543,8 @@ public final class EyeMeasurementHud {
 	}
 
 	public static void onChatRender(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-		if (!visible) {
-			dragging = false;
+		if (!visible && !zoomVisible) {
+			dragTarget = DragTarget.NONE;
 			return;
 		}
 
@@ -296,33 +552,79 @@ public final class EyeMeasurementHud {
 		double scaledMouseX = mouseX / safeScale;
 		double scaledMouseY = mouseY / safeScale;
 
-		if (dragging) {
-			int minX = MARGIN;
-			int minY = MARGIN;
-			int maxX = Math.max(minX, lastGuiWidth - lastWidth - MARGIN);
-			int maxY = Math.max(minY, lastGuiHeight - lastHeight - MARGIN);
+		if (dragTarget == DragTarget.EYE_ZOOM && zoomVisible) {
+			applyDrag(scaledMouseX, scaledMouseY, zoomW, zoomH, true);
+		} else if (dragTarget == DragTarget.HUD && visible) {
+			applyDrag(scaledMouseX, scaledMouseY, lastWidth, lastHeight, false);
+		}
 
-			double clampedX = snapAxis(Math.clamp(scaledMouseX - dragOffsetX, minX, maxX), minX, maxX);
-			double clampedY = snapAxis(Math.clamp(scaledMouseY - dragOffsetY, minY, maxY), minY, maxY);
+		graphics.pose().pushMatrix();
+		try {
+			if (lastScale != 1.0F) {
+				graphics.pose().scale(lastScale, lastScale);
+			}
+			if (zoomVisible) {
+				boolean zoomActive = dragTarget == DragTarget.EYE_ZOOM
+					|| (dragTarget == DragTarget.NONE
+						&& !ThinModeHud.isDragging()
+						&& isInside(scaledMouseX, scaledMouseY, zoomX, zoomY, zoomW, zoomH));
+				graphics.outline(zoomX, zoomY, zoomW, zoomH, zoomActive ? HOVER_BORDER_COLOR : IDLE_CHAT_BORDER_COLOR);
+			}
+			if (visible && (dragTarget == DragTarget.HUD
+				|| (dragTarget == DragTarget.NONE
+					&& !ThinModeHud.isDragging()
+					&& isInside(scaledMouseX, scaledMouseY, lastX, lastY, lastWidth, lastHeight)))) {
+				graphics.outline(lastX, lastY, lastWidth, lastHeight, HOVER_BORDER_COLOR);
+			}
+		} finally {
+			graphics.pose().popMatrix();
+		}
+	}
 
-			ToolXConfig config = ToolXConfig.get();
-			config.eyeMeasurementHudX = maxX > minX ? (clampedX - minX) / (maxX - minX) : 0.0;
-			config.eyeMeasurementHudY = maxY > minY ? (clampedY - minY) / (maxY - minY) : 0.5;
+	private static void applyDrag(double scaledMouseX, double scaledMouseY, int boxW, int boxH, boolean isZoomBox) {
+		int minX = isZoomBox ? 0 : MARGIN;
+		int minY = isZoomBox ? 0 : MARGIN;
+		int maxX = Math.max(minX, lastGuiWidth - boxW - (isZoomBox ? 0 : MARGIN));
+		int maxY = Math.max(minY, lastGuiHeight - boxH - (isZoomBox ? 0 : MARGIN));
+
+		double clampedX = snapX(Math.clamp(scaledMouseX - dragOffsetX, minX, maxX), minX, maxX, boxW);
+		double clampedY = snapAxis(Math.clamp(scaledMouseY - dragOffsetY, minY, maxY), minY, maxY);
+
+		double normX = maxX > minX ? (clampedX - minX) / (maxX - minX) : 0.0;
+		double normY = maxY > minY ? (clampedY - minY) / (maxY - minY) : (isZoomBox ? 0.0 : 0.5);
+
+		ToolXConfig config = ToolXConfig.get();
+		if (isZoomBox) {
+			config.eyeZoomBoxX = normX;
+			config.eyeZoomBoxY = normY;
+			zoomX = (int) Math.round(clampedX);
+			zoomY = (int) Math.round(clampedY);
+		} else {
+			config.eyeMeasurementHudX = normX;
+			config.eyeMeasurementHudY = normY;
 			lastX = (int) Math.round(clampedX);
 			lastY = (int) Math.round(clampedY);
 		}
+	}
 
-		if (dragging || isInsideBox(scaledMouseX, scaledMouseY)) {
-			graphics.pose().pushMatrix();
-			try {
-				if (lastScale != 1.0F) {
-					graphics.pose().scale(lastScale, lastScale);
-				}
-				graphics.outline(lastX, lastY, lastWidth, lastHeight, HOVER_BORDER_COLOR);
-			} finally {
-				graphics.pose().popMatrix();
+	private static double snapX(double value, int min, int max, int boxW) {
+		if (max <= min) {
+			return min;
+		}
+		double[] anchors = {
+			min,
+			(min + max) * 0.5,
+			max,
+			lastStripLeft - boxW,
+			lastStripRight
+		};
+		for (double anchor : anchors) {
+			double clampedAnchor = Math.clamp(anchor, min, max);
+			if (Math.abs(value - clampedAnchor) <= SNAP_THRESHOLD) {
+				return clampedAnchor;
 			}
 		}
+		return value;
 	}
 
 	private static double snapAxis(double value, int min, int max) {
@@ -343,21 +645,18 @@ public final class EyeMeasurementHud {
 	}
 
 	public static void endDrag() {
-		if (dragging) {
-			dragging = false;
+		if (dragTarget != DragTarget.NONE) {
+			dragTarget = DragTarget.NONE;
 			ToolXConfig.get().save();
 		}
 	}
 
 	public static void cancelDrag() {
-		dragging = false;
+		dragTarget = DragTarget.NONE;
 	}
 
-	private static boolean isInsideBox(double mouseX, double mouseY) {
-		return mouseX >= lastX
-			&& mouseX <= lastX + lastWidth
-			&& mouseY >= lastY
-			&& mouseY <= lastY + lastHeight;
+	private static boolean isInside(double mouseX, double mouseY, int x, int y, int w, int h) {
+		return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
 	}
 
 	private static Component colored(String text, int rgb) {

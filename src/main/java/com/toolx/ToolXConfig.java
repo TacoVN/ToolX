@@ -21,11 +21,16 @@ public final class ToolXConfig {
 	public String eyeMeasurementKey = InputConstants.UNKNOWN.getName();
 	public double eyeMeasurementHudX = 0.0;
 	public double eyeMeasurementHudY = 0.5;
-	public boolean pieChart2DMode = true;
+	public double eyeZoomBoxX = -1.0;
+	public double eyeZoomBoxY = -1.0;
 	public boolean pieChartAutoReset = true;
 	public String endarKey = InputConstants.UNKNOWN.getName();
 	public String piedarKey = InputConstants.UNKNOWN.getName();
 	public String preemptiveNavigationKey = InputConstants.UNKNOWN.getName();
+	public double thinECounterX = -1.0;
+	public double thinECounterY = -1.0;
+	public double thinPieChartX = -1.0;
+	public double thinPieChartY = -1.0;
 	private transient InputConstants.Key cachedEyeMeasurementKey = InputConstants.UNKNOWN;
 	private transient InputConstants.Key cachedEndarKey = InputConstants.UNKNOWN;
 	private transient InputConstants.Key cachedPiedarKey = InputConstants.UNKNOWN;
@@ -73,7 +78,20 @@ public final class ToolXConfig {
 		if (instance.preemptiveNavigationKey == null || instance.preemptiveNavigationKey.isBlank()) {
 			instance.preemptiveNavigationKey = InputConstants.UNKNOWN.getName();
 		}
+		instance.thinECounterX = sanitizeOptionalAxis(instance.thinECounterX);
+		instance.thinECounterY = sanitizeOptionalAxis(instance.thinECounterY);
+		instance.thinPieChartX = sanitizeOptionalAxis(instance.thinPieChartX);
+		instance.thinPieChartY = sanitizeOptionalAxis(instance.thinPieChartY);
+		instance.eyeZoomBoxX = sanitizeOptionalAxis(instance.eyeZoomBoxX);
+		instance.eyeZoomBoxY = sanitizeOptionalAxis(instance.eyeZoomBoxY);
 		instance.refreshCachedKeys();
+	}
+
+	private static double sanitizeOptionalAxis(double value) {
+		if (!Double.isFinite(value) || value < 0.0) {
+			return -1.0;
+		}
+		return Math.clamp(value, 0.0, 1.0);
 	}
 
 	private void refreshCachedKeys() {
