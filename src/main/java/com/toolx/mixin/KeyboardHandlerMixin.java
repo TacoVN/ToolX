@@ -81,7 +81,11 @@ public abstract class KeyboardHandlerMixin {
 		if (handle == 0L || handle != this.minecraft.getWindow().handle() || action != 1) {
 			return;
 		}
-		if (!toolx$isNonGameplayKey(event.key())) {
+		if (!toolx$isNonGameplayKey(event.key())
+			&& !this.minecraft.options.keyDebugModifier.matches(event)
+			&& !this.minecraft.options.keyDebugModifier.isDown()
+			&& !this.minecraft.options.keyChat.matches(event)
+			&& !this.minecraft.options.keyCommand.matches(event)) {
 			TimerController.onFirstInput(this.minecraft);
 		}
 		if (this.minecraft.options.keyDebugModifier.isDown()) {

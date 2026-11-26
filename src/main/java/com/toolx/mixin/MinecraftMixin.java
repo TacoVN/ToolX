@@ -3,6 +3,7 @@ package com.toolx.mixin;
 import com.toolx.EyeMeasurementController;
 import com.toolx.PieChartController;
 import com.toolx.TimerController;
+import com.toolx.gui.ResourceTrackerHud;
 import com.toolx.gui.StripTransition;
 import java.util.Optional;
 import net.minecraft.client.Minecraft;
@@ -78,6 +79,7 @@ public abstract class MinecraftMixin {
 		PieChartController.resetTracking((Minecraft) (Object) this);
 		EyeMeasurementController.reset();
 		TimerController.onDisconnect();
+		ResourceTrackerHud.resetState();
 		StripTransition.snapOff();
 	}
 
@@ -86,6 +88,7 @@ public abstract class MinecraftMixin {
 		PieChartController.resetTracking((Minecraft) (Object) this);
 		EyeMeasurementController.reset();
 		TimerController.onDisconnect();
+		ResourceTrackerHud.resetState();
 		StripTransition.snapOff();
 	}
 }

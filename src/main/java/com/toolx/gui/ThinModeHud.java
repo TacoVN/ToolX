@@ -307,6 +307,7 @@ public final class ThinModeHud {
 				|| (dragTarget == DragTarget.NONE
 					&& !EyeMeasurementHud.isDragging()
 					&& !TimerHud.isDragging()
+					&& !ResourceTrackerHud.isDragging()
 					&& lastChatMouseX >= 0.0
 					&& isInside(lastChatMouseX, lastChatMouseY, pieX, pieY, pieW, pieH));
 			graphics.nextStratum();
@@ -382,6 +383,7 @@ public final class ThinModeHud {
 				|| (dragTarget == DragTarget.NONE
 					&& !EyeMeasurementHud.isDragging()
 					&& !TimerHud.isDragging()
+					&& !ResourceTrackerHud.isDragging()
 					&& isInside(scaledMouseX, scaledMouseY, eX, eY, eW, eH));
 			graphics.pose().pushMatrix();
 			try {

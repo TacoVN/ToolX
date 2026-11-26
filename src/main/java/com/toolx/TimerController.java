@@ -4,6 +4,7 @@ import com.toolx.gui.TimerHud;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.world.level.GameType;
 import org.jspecify.annotations.Nullable;
 
 public final class TimerController {
@@ -47,6 +48,20 @@ public final class TimerController {
 		}
 	}
 
+	public static boolean isRunning() {
+		return status == TimerStatus.RUNNING;
+	}
+
+	public static boolean isCompleted() {
+		return status == TimerStatus.COMPLETED;
+	}
+
+	private static boolean isSurvivalMode(@Nullable Minecraft minecraft) {
+		return minecraft != null
+			&& minecraft.gameMode != null
+			&& minecraft.gameMode.getPlayerMode() == GameType.SURVIVAL;
+	}
+
 	public static void onFirstInput(@Nullable Minecraft minecraft) {
 		if (status != TimerStatus.IDLE) {
 			return;
@@ -59,11 +74,25 @@ public final class TimerController {
 			|| minecraft.gui.overlay() != null) {
 			return;
 		}
+		if (!isSurvivalMode(minecraft)) {
+			clear();
+			return;
+		}
 		startNanos = System.nanoTime();
 		status = TimerStatus.RUNNING;
 	}
 
 	public static void onClientTick(@Nullable Minecraft minecraft) {
+		if (minecraft != null
+			&& minecraft.level != null
+			&& minecraft.player != null
+			&& minecraft.gameMode != null
+			&& minecraft.gameMode.getPlayerMode() != GameType.SURVIVAL) {
+			if (status == TimerStatus.IDLE || status == TimerStatus.RUNNING) {
+				clear();
+			}
+			return;
+		}
 		if (status != TimerStatus.IDLE || minecraft == null || minecraft.options == null) {
 			return;
 		}

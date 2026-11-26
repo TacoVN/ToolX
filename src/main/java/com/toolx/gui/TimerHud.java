@@ -17,6 +17,7 @@ import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.client.gui.screens.options.OptionsSubScreen;
 import net.minecraft.client.gui.screens.packs.PackSelectionScreen;
 import net.minecraft.client.gui.screens.telemetry.TelemetryInfoScreen;
+import net.minecraft.world.level.GameType;
 import org.jspecify.annotations.Nullable;
 
 public final class TimerHud {
@@ -26,7 +27,9 @@ public final class TimerHud {
 	private static final int TEXT_HEIGHT = 9;
 	private static final double SNAP_THRESHOLD = 6.0;
 
-	private static final int TEXT_COLOR = 0xFFFFFFFF;
+	private static final int IDLE_TEXT_COLOR = 0xFFFF0B0B;
+	private static final int RUNNING_TEXT_COLOR = 0xFFFFFFFF;
+	private static final int COMPLETED_TEXT_COLOR = 0xFF1FFF1F;
 	private static final int OUTLINE_COLOR = 0xFF000000;
 	private static final int IDLE_CHAT_BORDER_COLOR = 0x66FFFFFF;
 	private static final int ACTIVE_BORDER_COLOR = 0xEEFFFFFF;
@@ -62,12 +65,17 @@ public final class TimerHud {
 			|| minecraft == null
 			|| minecraft.level == null
 			|| minecraft.player == null
+			|| minecraft.gameMode == null
+			|| minecraft.gameMode.getPlayerMode() != GameType.SURVIVAL
 			|| minecraft.getWindow() == null
 			|| minecraft.options == null
 			|| minecraft.gui == null) {
 			return false;
 		}
 		if (StripTransition.isStripModeActive(minecraft) || StripTransition.easedProgress() > 0.0005F) {
+			return false;
+		}
+		if (minecraft.debugEntries != null && minecraft.debugEntries.isOverlayVisible()) {
 			return false;
 		}
 		Screen screen = minecraft.gui.screen();
@@ -77,7 +85,7 @@ public final class TimerHud {
 		return !(minecraft.gui.hud != null && minecraft.gui.hud.isHidden() && screen == null);
 	}
 
-	private static boolean isOptionsScreen(@Nullable Screen screen) {
+	public static boolean isOptionsScreen(@Nullable Screen screen) {
 		return screen instanceof OptionsScreen
 			|| screen instanceof OptionsSubScreen
 			|| screen instanceof InWorldGameRulesScreen
@@ -148,7 +156,10 @@ public final class TimerHud {
 						graphics.text(font, text, dx, dy, OUTLINE_COLOR, false);
 					}
 				}
-				graphics.text(font, text, 0, 0, TEXT_COLOR, false);
+				int textColor = TimerController.isCompleted()
+					? COMPLETED_TEXT_COLOR
+					: (TimerController.isRunning() ? RUNNING_TEXT_COLOR : IDLE_TEXT_COLOR);
+				graphics.text(font, text, 0, 0, textColor, false);
 			} finally {
 				graphics.pose().popMatrix();
 			}
@@ -157,6 +168,7 @@ public final class TimerHud {
 				boolean active = dragging
 					|| (!ThinModeHud.isDragging()
 						&& !EyeMeasurementHud.isDragging()
+						&& !ResourceTrackerHud.isDragging()
 						&& lastChatMouseX >= 0.0
 						&& isInside(lastChatMouseX, lastChatMouseY, boxX, boxY, boxW, boxH));
 				graphics.outline(boxX, boxY, boxW, boxH, active ? ACTIVE_BORDER_COLOR : IDLE_CHAT_BORDER_COLOR);
@@ -186,7 +198,7 @@ public final class TimerHud {
 			dragging = false;
 			ToolXConfig config = ToolXConfig.get();
 			config.timerHudX = 1.0;
-			config.timerHudY = 0.0;
+			config.timerHudY = 0.5;
 			config.save();
 			return true;
 		}
@@ -219,7 +231,7 @@ public final class TimerHud {
 
 		ToolXConfig config = ToolXConfig.get();
 		config.timerHudX = maxX > minX ? (clampedX - minX) / (maxX - minX) : 1.0;
-		config.timerHudY = maxY > minY ? (clampedY - minY) / (maxY - minY) : 0.0;
+		config.timerHudY = maxY > minY ? (clampedY - minY) / (maxY - minY) : 0.5;
 		lastX = (int) Math.round(clampedX);
 		lastY = (int) Math.round(clampedY);
 	}

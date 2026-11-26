@@ -117,6 +117,12 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 			createToggle("Timer", config.timer, value -> {
 				config.timer = value;
 				TimerController.onToggleChanged(value);
+			}, config),
+			createToggle("Resource Tracker", config.resourceTracker, value -> {
+				config.resourceTracker = value;
+				if (!value) {
+					ResourceTrackerHud.resetState();
+				}
 			}, config)
 		);
 		this.toolXList.addKeyBind(

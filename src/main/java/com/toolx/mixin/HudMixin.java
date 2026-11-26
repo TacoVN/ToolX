@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.Window;
 import com.toolx.EyeMeasurementController;
 import com.toolx.PieChartController;
 import com.toolx.gui.EyeMeasurementHud;
+import com.toolx.gui.ResourceTrackerHud;
 import com.toolx.gui.StripTransition;
 import com.toolx.gui.ThinModeHud;
 import net.minecraft.client.DeltaTracker;
@@ -98,6 +99,7 @@ public abstract class HudMixin {
 		}
 		ThinModeHud.extractECounter(this.minecraft, graphics);
 		EyeMeasurementHud.extractRenderState(this.minecraft, graphics);
+		ResourceTrackerHud.extractRenderState(this.minecraft, graphics);
 	}
 
 	@Unique

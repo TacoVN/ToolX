@@ -1,6 +1,7 @@
 package com.toolx.mixin;
 
 import com.toolx.gui.EyeMeasurementHud;
+import com.toolx.gui.ResourceTrackerHud;
 import com.toolx.gui.ThinModeHud;
 import com.toolx.gui.TimerHud;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -18,7 +19,8 @@ public abstract class ChatScreenMixin {
 	private void toolx$onChatMouseClicked(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
 		if (ThinModeHud.onChatMouseClicked(event.x(), event.y(), event.button())
 			|| EyeMeasurementHud.onChatMouseClicked(event.x(), event.y(), event.button())
-			|| TimerHud.onChatMouseClicked(event.x(), event.y(), event.button())) {
+			|| TimerHud.onChatMouseClicked(event.x(), event.y(), event.button())
+			|| ResourceTrackerHud.onChatMouseClicked(event.x(), event.y(), event.button())) {
 			cir.setReturnValue(true);
 		}
 	}
@@ -28,6 +30,7 @@ public abstract class ChatScreenMixin {
 		ThinModeHud.onChatRender(graphics, mouseX, mouseY);
 		EyeMeasurementHud.onChatRender(graphics, mouseX, mouseY);
 		TimerHud.onChatRender(mouseX, mouseY);
+		ResourceTrackerHud.onChatRender(graphics, mouseX, mouseY);
 	}
 
 	@Inject(method = "removed", at = @At("HEAD"))
@@ -35,5 +38,6 @@ public abstract class ChatScreenMixin {
 		ThinModeHud.endDrag();
 		EyeMeasurementHud.endDrag();
 		TimerHud.endDrag();
+		ResourceTrackerHud.endDrag();
 	}
 }

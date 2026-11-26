@@ -13,6 +13,8 @@ import net.minecraft.client.gui.components.DebugScreenOverlay;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.gui.components.debug.DebugScreenEntryStatus;
 import net.minecraft.client.gui.components.debug.DebugScreenProfile;
+import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.SectionOcclusionGraph;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
@@ -130,7 +132,7 @@ public final class PieChartController {
 			|| minecraft.level == null
 			|| minecraft.player == null
 			|| minecraft.gui == null
-			|| minecraft.gui.screen() != null
+			|| !isAllowedRadarScreen(minecraft.gui.screen())
 			|| minecraft.gui.overlay() != null
 			|| minecraft.debugEntries == null
 			|| minecraft.getDebugOverlay() == null) {
@@ -212,6 +214,10 @@ public final class PieChartController {
 			}
 		}
 		return true;
+	}
+
+	private static boolean isAllowedRadarScreen(@Nullable Screen screen) {
+		return screen == null || (screen instanceof PauseScreen pause && !pause.showsPauseMenu());
 	}
 
 	private static boolean restoreChunkBorders(

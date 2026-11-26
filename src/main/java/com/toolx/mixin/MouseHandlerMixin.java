@@ -5,6 +5,7 @@ import com.toolx.EyeMeasurementController;
 import com.toolx.PieChartController;
 import com.toolx.TimerController;
 import com.toolx.gui.EyeMeasurementHud;
+import com.toolx.gui.ResourceTrackerHud;
 import com.toolx.gui.ThinModeHud;
 import com.toolx.gui.TimerHud;
 import net.minecraft.client.Minecraft;
@@ -49,6 +50,7 @@ public abstract class MouseHandlerMixin {
 			ThinModeHud.endDrag();
 			EyeMeasurementHud.endDrag();
 			TimerHud.endDrag();
+			ResourceTrackerHud.endDrag();
 			return;
 		}
 		if (action != 1) {

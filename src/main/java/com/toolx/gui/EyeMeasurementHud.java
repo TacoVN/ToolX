@@ -14,9 +14,9 @@ import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.toolx.EyeMeasurementController;
 import com.toolx.EyeMeasurementController.Result;
 import com.toolx.ToolXConfig;
+import com.toolx.gui.ThinModeHud.DebugSpace;
 import com.toolx.mixin.GuiGraphicsExtractorInvoker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Options;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Hud;
@@ -219,7 +219,8 @@ public final class EyeMeasurementHud {
 			return;
 		}
 
-		if (minecraft.gui.hud.isHidden() && minecraft.gui.screen() == null) {
+		if ((minecraft.gui.hud.isHidden() && minecraft.gui.screen() == null)
+			|| TimerHud.isOptionsScreen(minecraft.gui.screen())) {
 			visible = false;
 			zoomVisible = false;
 			dragTarget = DragTarget.NONE;
@@ -236,30 +237,20 @@ public final class EyeMeasurementHud {
 			return;
 		}
 
-		Window window = minecraft.getWindow();
-		int guiScale = Math.max(1, window.getGuiScale());
-		int rawDebugScale = minecraft.options.debugGuiScale().get();
-		int debugScale;
-		if (rawDebugScale == Options.DEBUG_GUI_SCALE_UNCHANGED) {
-			debugScale = guiScale;
-		} else if (rawDebugScale == Options.AUTO_GUI_SCALE) {
-			debugScale = window.calculateScale(0, minecraft.isEnforceUnicode()) / 2;
-		} else {
-			debugScale = window.calculateScale(rawDebugScale, minecraft.isEnforceUnicode());
+		DebugSpace space = ThinModeHud.computeDebugSpace(minecraft, graphics);
+		if (space == null) {
+			visible = false;
+			zoomVisible = false;
+			dragTarget = DragTarget.NONE;
+			return;
 		}
-
-		boolean scaled = debugScale < guiScale && debugScale > 0;
-		float scale = scaled ? (float) debugScale / (float) guiScale : 1.0F;
-		int guiWidth = scaled ? Math.max(1, window.getWidth() / debugScale) : Math.max(1, graphics.guiWidth());
-		int guiHeight = scaled ? Math.max(1, window.getHeight() / debugScale) : Math.max(1, graphics.guiHeight());
-
-		int physW = Math.max(1, window.getWidth());
-		int physH = Math.max(1, window.getHeight());
-		int physThinW = Math.round(physH * ThinModeHud.THIN_ASPECT);
-		int physLeftBarW = Math.max(0, (physW - physThinW) / 2);
-		int physRightBarX = Math.min(physW, physLeftBarW + physThinW);
-		int stripLeft = Math.round((float) physLeftBarW * guiWidth / (float) physW);
-		int stripRight = Math.round((float) physRightBarX * guiWidth / (float) physW);
+		Window window = minecraft.getWindow();
+		float scale = space.scale();
+		boolean scaled = scale < 1.0F;
+		int guiWidth = space.debugWidth();
+		int guiHeight = space.debugHeight();
+		int stripLeft = space.stripLeft();
+		int stripRight = space.stripRight();
 
 		lastGuiWidth = guiWidth;
 		lastGuiHeight = guiHeight;
@@ -568,15 +559,18 @@ public final class EyeMeasurementHud {
 					|| (dragTarget == DragTarget.NONE
 						&& !ThinModeHud.isDragging()
 						&& !TimerHud.isDragging()
+						&& !ResourceTrackerHud.isDragging()
 						&& isInside(scaledMouseX, scaledMouseY, zoomX, zoomY, zoomW, zoomH));
 				graphics.outline(zoomX, zoomY, zoomW, zoomH, zoomActive ? HOVER_BORDER_COLOR : IDLE_CHAT_BORDER_COLOR);
 			}
-			if (visible && (dragTarget == DragTarget.HUD
-				|| (dragTarget == DragTarget.NONE
-					&& !ThinModeHud.isDragging()
-					&& !TimerHud.isDragging()
-					&& isInside(scaledMouseX, scaledMouseY, lastX, lastY, lastWidth, lastHeight)))) {
-				graphics.outline(lastX, lastY, lastWidth, lastHeight, HOVER_BORDER_COLOR);
+			if (visible) {
+				boolean hudActive = dragTarget == DragTarget.HUD
+					|| (dragTarget == DragTarget.NONE
+						&& !ThinModeHud.isDragging()
+						&& !TimerHud.isDragging()
+						&& !ResourceTrackerHud.isDragging()
+						&& isInside(scaledMouseX, scaledMouseY, lastX, lastY, lastWidth, lastHeight));
+				graphics.outline(lastX, lastY, lastWidth, lastHeight, hudActive ? HOVER_BORDER_COLOR : IDLE_CHAT_BORDER_COLOR);
 			}
 		} finally {
 			graphics.pose().popMatrix();
