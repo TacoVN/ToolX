@@ -11,6 +11,7 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Hud;
+import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -25,8 +26,23 @@ public abstract class HudMixin {
 	@Final
 	private Minecraft minecraft;
 
+	@Shadow
+	private @Nullable Runnable deferredSubtitles;
+
 	@Unique
 	private boolean toolx$scaledHotbar;
+
+	@Inject(method = "extractSubtitleOverlay", at = @At("HEAD"), cancellable = true)
+	private void toolx$hideSubtitlesInThinMode(
+		GuiGraphicsExtractor graphics,
+		boolean deferRendering,
+		CallbackInfo info
+	) {
+		if (StripTransition.isStripModeActive(this.minecraft) || StripTransition.easedProgress() > 0.0005F) {
+			this.deferredSubtitles = null;
+			info.cancel();
+		}
+	}
 
 	@Inject(
 		method = "extractRenderState",
@@ -97,7 +113,7 @@ public abstract class HudMixin {
 			StripTransition.snapOff();
 			PieChartController.syncThinCulling(this.minecraft);
 		}
-		ThinModeHud.extractECounter(this.minecraft, graphics);
+		ThinModeHud.extractCounters(this.minecraft, graphics);
 		EyeMeasurementHud.extractRenderState(this.minecraft, graphics);
 		ResourceTrackerHud.extractRenderState(this.minecraft, graphics);
 	}

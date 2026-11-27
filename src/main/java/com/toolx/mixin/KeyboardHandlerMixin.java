@@ -2,6 +2,7 @@ package com.toolx.mixin;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.toolx.EyeMeasurementController;
+import com.toolx.KeyBindsController;
 import com.toolx.PieChartController;
 import com.toolx.TimerController;
 import com.toolx.ToolXConfig;
@@ -9,6 +10,7 @@ import net.minecraft.client.KeyboardHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -76,6 +78,25 @@ public abstract class KeyboardHandlerMixin {
 		}
 	}
 
+	@Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
+	private void toolx$handleBoundBackspaceKey(long handle, int action, KeyEvent event, CallbackInfo info) {
+		if (handle != 0L
+			&& handle == this.minecraft.getWindow().handle()
+			&& (action == 1 || action == -1)
+			&& KeyBindsController.handleScreenBackspaceKey(this.minecraft, event)) {
+			info.cancel();
+		}
+	}
+
+	@Inject(method = "charTyped", at = @At("HEAD"), cancellable = true)
+	private void toolx$suppressCharForBoundBackspace(long handle, CharacterEvent event, CallbackInfo info) {
+		if (handle != 0L
+			&& handle == this.minecraft.getWindow().handle()
+			&& KeyBindsController.consumeSuppressedChar()) {
+			info.cancel();
+		}
+	}
+
 	@Inject(method = "keyPress", at = @At("TAIL"))
 	private void toolx$handleRadarKey(long handle, int action, KeyEvent event, CallbackInfo info) {
 		if (handle == 0L || handle != this.minecraft.getWindow().handle() || action != 1) {
@@ -92,7 +113,8 @@ public abstract class KeyboardHandlerMixin {
 			return;
 		}
 		InputConstants.Key key = InputConstants.getKey(event);
-		if (!PieChartController.handleRadarKey(this.minecraft, key)) {
+		if (!PieChartController.handleRadarKey(this.minecraft, key)
+			&& !KeyBindsController.handlePieZeroKey(this.minecraft, key)) {
 			EyeMeasurementController.handleMeasureKey(this.minecraft, key);
 		}
 	}

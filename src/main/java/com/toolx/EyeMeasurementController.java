@@ -111,6 +111,12 @@ public final class EyeMeasurementController {
 		}
 	}
 
+	public static void onScreenChanged(@Nullable Screen screen) {
+		if (measuring && !isAllowedWhileMeasuring(screen)) {
+			measuring = false;
+		}
+	}
+
 	public static void handleMeasureKey(@Nullable Minecraft minecraft, InputConstants.Key pressedKey) {
 		if (minecraft == null
 			|| minecraft.level == null

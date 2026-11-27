@@ -46,14 +46,23 @@ public final class TimerHud {
 	private static boolean dragging;
 	private static double dragOffsetX;
 	private static double dragOffsetY;
-	private static double lastChatMouseX = -1.0;
-	private static double lastChatMouseY = -1.0;
+	private static boolean chatHovered;
 
 	private TimerHud() {
 	}
 
 	public static boolean isDragging() {
 		return dragging;
+	}
+
+	public static boolean isHovered(double mouseX, double mouseY) {
+		if (!visible || !shouldRender(Minecraft.getInstance())) {
+			return false;
+		}
+		double safeScale = lastScale > 0.0F ? lastScale : 1.0F;
+		double scaledX = mouseX / safeScale;
+		double scaledY = mouseY / safeScale;
+		return isInside(scaledX, scaledY, lastX, lastY, lastW, lastH);
 	}
 
 	public static void cancelDrag() {
@@ -99,6 +108,7 @@ public final class TimerHud {
 		if (!shouldRender(minecraft)) {
 			visible = false;
 			dragging = false;
+			chatHovered = false;
 			return;
 		}
 
@@ -106,6 +116,7 @@ public final class TimerHud {
 		if (space == null) {
 			visible = false;
 			dragging = false;
+			chatHovered = false;
 			return;
 		}
 
@@ -165,12 +176,7 @@ public final class TimerHud {
 			}
 
 			if (minecraft.gui.screen() instanceof ChatScreen) {
-				boolean active = dragging
-					|| (!ThinModeHud.isDragging()
-						&& !EyeMeasurementHud.isDragging()
-						&& !ResourceTrackerHud.isDragging()
-						&& lastChatMouseX >= 0.0
-						&& isInside(lastChatMouseX, lastChatMouseY, boxX, boxY, boxW, boxH));
+				boolean active = dragging || chatHovered;
 				graphics.outline(boxX, boxY, boxW, boxH, active ? ACTIVE_BORDER_COLOR : IDLE_CHAT_BORDER_COLOR);
 			}
 		} finally {
@@ -208,15 +214,19 @@ public final class TimerHud {
 	public static void onChatRender(int mouseX, int mouseY) {
 		if (!visible || !shouldRender(Minecraft.getInstance())) {
 			dragging = false;
-			lastChatMouseX = -1.0;
-			lastChatMouseY = -1.0;
+			chatHovered = false;
 			return;
 		}
 		double safeScale = lastScale > 0.0F ? lastScale : 1.0F;
 		double scaledMouseX = mouseX / safeScale;
 		double scaledMouseY = mouseY / safeScale;
-		lastChatMouseX = scaledMouseX;
-		lastChatMouseY = scaledMouseY;
+		chatHovered = !dragging
+			&& !ThinModeHud.isDragging()
+			&& !EyeMeasurementHud.isDragging()
+			&& !ResourceTrackerHud.isDragging()
+			&& !ThinModeHud.isHovered(mouseX, mouseY)
+			&& !EyeMeasurementHud.isHovered(mouseX, mouseY)
+			&& isInside(scaledMouseX, scaledMouseY, lastX, lastY, lastW, lastH);
 		if (!dragging) {
 			return;
 		}

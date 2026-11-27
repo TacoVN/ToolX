@@ -13,6 +13,7 @@ import net.minecraft.client.gui.components.DebugScreenOverlay;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.gui.components.debug.DebugScreenEntryStatus;
 import net.minecraft.client.gui.components.debug.DebugScreenProfile;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.SectionOcclusionGraph;
@@ -76,10 +77,12 @@ public final class PieChartController {
 			return false;
 		}
 		ToolXConfig config = ToolXConfig.get();
+		InputConstants.Key pieZero = config.pieZeroKey();
 		return matchesDigit(config.eyeMeasurementKey(), digit)
 			|| matchesDigit(config.endarKey(), digit)
 			|| matchesDigit(config.piedarKey(), digit)
-			|| matchesDigit(config.preemptiveNavigationKey(), digit);
+			|| matchesDigit(config.preemptiveNavigationKey(), digit)
+			|| (!pieZero.equals(KeyBindsController.DEFAULT_PIE_ZERO_KEY) && matchesDigit(pieZero, digit));
 	}
 
 	private static boolean matchesDigit(InputConstants.Key key, int digit) {
@@ -247,6 +250,19 @@ public final class PieChartController {
 		};
 	}
 
+	public static void onScreenChanged(@Nullable Minecraft minecraft, @Nullable Screen screen) {
+		if (activeRadarMode != RadarMode.NONE && !isAllowedWhileRadarActive(screen)) {
+			deactivateRadar(minecraft, true);
+			StripTransition.snapOff();
+		}
+	}
+
+	private static boolean isAllowedWhileRadarActive(@Nullable Screen screen) {
+		return screen == null
+			|| screen instanceof ChatScreen
+			|| (screen instanceof PauseScreen pause && !pause.showsPauseMenu());
+	}
+
 	private static void deactivateRadar(@Nullable Minecraft minecraft, boolean restoreOverlayState) {
 		activeRadarMode = RadarMode.NONE;
 		ThinModeHud.resetState();
@@ -282,18 +298,19 @@ public final class PieChartController {
 				minecraft.debugEntries.rebuildCurrentList();
 			}
 		}
+
+		if (debugOverlay != null && !debugOverlay.showProfilerChart()) {
+			debugOverlay.getProfilerPieChart().setPieChartResults(null);
+		}
 	}
 
 	public static void onClientTick(Minecraft minecraft) {
 		if (activeRadarMode != RadarMode.NONE
 			&& minecraft != null
-			&& minecraft.debugEntries != null
-			&& minecraft.getDebugOverlay() != null) {
-			boolean overlayVisible = minecraft.debugEntries.isOverlayVisible();
-			boolean profilerVisible = ((DebugScreenOverlayAccessor) minecraft.getDebugOverlay()).toolx$isRenderProfilerChart();
-			if (!overlayVisible || !profilerVisible) {
-				deactivateRadar(minecraft, false);
-			}
+			&& minecraft.gui != null
+			&& !isAllowedWhileRadarActive(minecraft.gui.screen())) {
+			deactivateRadar(minecraft, true);
+			StripTransition.snapOff();
 		}
 
 		syncThinCulling(minecraft);
@@ -314,6 +331,17 @@ public final class PieChartController {
 		int cx = currentChunk.x();
 		int cz = currentChunk.z();
 		ResourceKey<Level> dim = minecraft.level.dimension();
+
+		boolean chartVisible = minecraft.getDebugOverlay() != null && minecraft.getDebugOverlay().showProfilerChart();
+		if (!chartVisible) {
+			pendingReset = false;
+			deferredChunkReset = false;
+			lastChunkX = cx;
+			lastChunkZ = cz;
+			lastDimension = dim;
+			hasLastChunk = true;
+			return;
+		}
 
 		if (hasLastChunk && (cx != lastChunkX || cz != lastChunkZ || dim != lastDimension)) {
 			deferredChunkReset = true;

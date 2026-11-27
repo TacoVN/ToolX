@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GuiProfilerChartRenderer.class)
 public abstract class GuiProfilerChartRendererMixin {
 	@Unique
-	private static final float RADIUS_2D = 105.0F;
+	private static final float RADIUS_2D = 57.5F;
 
 	@Inject(method = "renderToTexture", at = @At("HEAD"), cancellable = true)
 	private void toolx$render2DChartInThinMode(

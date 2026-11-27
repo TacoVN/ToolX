@@ -1,5 +1,7 @@
 package com.toolx.mixin;
 
+import com.toolx.EyeMeasurementController;
+import com.toolx.ToolXConfig;
 import com.toolx.gui.ThinModeHud;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -25,6 +27,13 @@ public abstract class DebugScreenOverlayMixin {
 	@Unique
 	private boolean toolx$clippedThinLines;
 
+	@Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true)
+	private void toolx$hideDebugOverlayDuringEyeMeasurement(GuiGraphicsExtractor graphics, CallbackInfo info) {
+		if (EyeMeasurementController.isMeasuring()) {
+			info.cancel();
+		}
+	}
+
 	@Redirect(
 		method = "extractRenderState",
 		at = @At(
@@ -32,8 +41,8 @@ public abstract class DebugScreenOverlayMixin {
 			target = "Lnet/minecraft/client/gui/components/debug/DebugScreenEntryList;isOverlayVisible()Z"
 		)
 	)
-	private boolean toolx$hideDebugChartsHintInThinMode(DebugScreenEntryList entries) {
-		if (ThinModeHud.shouldRenderThinLayout(this.minecraft)) {
+	private boolean toolx$controlF3DebugChartHint(DebugScreenEntryList entries) {
+		if (!ToolXConfig.get().f3DebugChart) {
 			return false;
 		}
 		return entries.isOverlayVisible();

@@ -1,5 +1,6 @@
 package com.toolx.mixin;
 
+import com.toolx.KeyBindsController;
 import com.toolx.gui.EyeMeasurementHud;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
@@ -27,5 +28,6 @@ public abstract class GameRendererMixin {
 	@Inject(method = "close", at = @At("HEAD"))
 	private void toolx$closeEyeZoomTexture(CallbackInfo info) {
 		EyeMeasurementHud.closeZoomResources();
+		KeyBindsController.releaseWindowsKeySuppression(this.minecraft);
 	}
 }

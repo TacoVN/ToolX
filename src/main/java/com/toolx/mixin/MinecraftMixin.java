@@ -1,6 +1,7 @@
 package com.toolx.mixin;
 
 import com.toolx.EyeMeasurementController;
+import com.toolx.KeyBindsController;
 import com.toolx.PieChartController;
 import com.toolx.TimerController;
 import com.toolx.gui.ResourceTrackerHud;
@@ -37,6 +38,7 @@ public abstract class MinecraftMixin {
 		PieChartController.onClientTick(self);
 		EyeMeasurementController.onClientTick(self);
 		TimerController.onClientTick(self);
+		KeyBindsController.syncWindowsKeySuppression(self);
 	}
 
 	@Inject(
@@ -80,6 +82,8 @@ public abstract class MinecraftMixin {
 		EyeMeasurementController.reset();
 		TimerController.onDisconnect();
 		ResourceTrackerHud.resetState();
+		KeyBindsController.resetTransientState();
+		KeyBindsController.releaseWindowsKeySuppression((Minecraft) (Object) this);
 		StripTransition.snapOff();
 	}
 
@@ -89,6 +93,8 @@ public abstract class MinecraftMixin {
 		EyeMeasurementController.reset();
 		TimerController.onDisconnect();
 		ResourceTrackerHud.resetState();
+		KeyBindsController.resetTransientState();
+		KeyBindsController.releaseWindowsKeySuppression((Minecraft) (Object) this);
 		StripTransition.snapOff();
 	}
 }

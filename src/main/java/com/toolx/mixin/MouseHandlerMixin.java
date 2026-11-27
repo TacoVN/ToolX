@@ -2,6 +2,7 @@ package com.toolx.mixin;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.toolx.EyeMeasurementController;
+import com.toolx.KeyBindsController;
 import com.toolx.PieChartController;
 import com.toolx.TimerController;
 import com.toolx.gui.EyeMeasurementHud;
@@ -41,6 +42,16 @@ public abstract class MouseHandlerMixin {
 		}
 	}
 
+	@Inject(method = "onButton", at = @At("HEAD"), cancellable = true)
+	private void toolx$handleBoundBackspaceMouse(long handle, MouseButtonInfo rawButtonInfo, int action, CallbackInfo info) {
+		if (handle != 0L
+			&& handle == this.minecraft.getWindow().handle()
+			&& action == 1
+			&& KeyBindsController.handleScreenBackspaceMouse(this.minecraft, rawButtonInfo)) {
+			info.cancel();
+		}
+	}
+
 	@Inject(method = "onButton", at = @At("TAIL"))
 	private void toolx$handleRadarMouse(long handle, MouseButtonInfo rawButtonInfo, int action, CallbackInfo info) {
 		if (handle == 0L || handle != this.minecraft.getWindow().handle()) {
@@ -56,12 +67,14 @@ public abstract class MouseHandlerMixin {
 		if (action != 1) {
 			return;
 		}
+		KeyBindsController.syncWindowsKeySuppression(this.minecraft);
 		TimerController.onFirstInput(this.minecraft);
 		if (this.minecraft.options.keyDebugModifier.isDown()) {
 			return;
 		}
 		InputConstants.Key key = InputConstants.Type.MOUSE.getOrCreate(rawButtonInfo.button());
-		if (!PieChartController.handleRadarKey(this.minecraft, key)) {
+		if (!PieChartController.handleRadarKey(this.minecraft, key)
+			&& !KeyBindsController.handlePieZeroKey(this.minecraft, key)) {
 			EyeMeasurementController.handleMeasureKey(this.minecraft, key);
 		}
 	}

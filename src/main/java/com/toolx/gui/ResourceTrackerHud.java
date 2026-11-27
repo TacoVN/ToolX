@@ -384,6 +384,9 @@ public final class ResourceTrackerHud {
 				|| (!ThinModeHud.isDragging()
 					&& !EyeMeasurementHud.isDragging()
 					&& !TimerHud.isDragging()
+					&& !ThinModeHud.isHovered(mouseX, mouseY)
+					&& !EyeMeasurementHud.isHovered(mouseX, mouseY)
+					&& !TimerHud.isHovered(mouseX, mouseY)
 					&& isInside(scaledMouseX, scaledMouseY, lastX, lastY, lastW, lastH));
 			graphics.outline(lastX, lastY, lastW, lastH, active ? ACTIVE_BORDER_COLOR : IDLE_CHAT_BORDER_COLOR);
 		} finally {

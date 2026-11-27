@@ -3,6 +3,7 @@ package com.toolx;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.mojang.blaze3d.platform.InputConstants;
+import com.toolx.gui.ThinModeHud;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
@@ -18,6 +19,7 @@ public final class ToolXConfig {
 	private static ToolXConfig instance;
 
 	public boolean f3F = true;
+	public int flightSpeed = 1;
 	public String eyeMeasurementKey = InputConstants.UNKNOWN.getName();
 	public double eyeMeasurementHudX = 0.0;
 	public double eyeMeasurementHudY = 0.5;
@@ -27,20 +29,27 @@ public final class ToolXConfig {
 	public String endarKey = InputConstants.UNKNOWN.getName();
 	public String piedarKey = InputConstants.UNKNOWN.getName();
 	public String preemptiveNavigationKey = InputConstants.UNKNOWN.getName();
-	public boolean timer = true;
+	public boolean timer = false;
 	public double timerHudX = 1.0;
 	public double timerHudY = 0.5;
 	public boolean resourceTracker = false;
 	public double resourceTrackerHudX = -1.0;
 	public double resourceTrackerHudY = -1.0;
+	public double thinCCounterX = -1.0;
+	public double thinCCounterY = -1.0;
 	public double thinECounterX = -1.0;
 	public double thinECounterY = -1.0;
 	public double thinPieChartX = -1.0;
 	public double thinPieChartY = -1.0;
+	public String pieZeroKey = KeyBindsController.DEFAULT_PIE_ZERO_KEY.getName();
+	public String backspaceKey = KeyBindsController.DEFAULT_BACKSPACE_KEY.getName();
+	public boolean f3DebugChart = false;
 	private transient InputConstants.Key cachedEyeMeasurementKey = InputConstants.UNKNOWN;
 	private transient InputConstants.Key cachedEndarKey = InputConstants.UNKNOWN;
 	private transient InputConstants.Key cachedPiedarKey = InputConstants.UNKNOWN;
 	private transient InputConstants.Key cachedPreemptiveNavigationKey = InputConstants.UNKNOWN;
+	private transient InputConstants.Key cachedPieZeroKey = KeyBindsController.DEFAULT_PIE_ZERO_KEY;
+	private transient InputConstants.Key cachedBackspaceKey = KeyBindsController.DEFAULT_BACKSPACE_KEY;
 
 	public static ToolXConfig get() {
 		if (instance == null) {
@@ -84,7 +93,16 @@ public final class ToolXConfig {
 		if (instance.preemptiveNavigationKey == null || instance.preemptiveNavigationKey.isBlank()) {
 			instance.preemptiveNavigationKey = InputConstants.UNKNOWN.getName();
 		}
-		instance.thinECounterX = sanitizeOptionalAxis(instance.thinECounterX);
+		if (instance.pieZeroKey == null || instance.pieZeroKey.isBlank()) {
+			instance.pieZeroKey = KeyBindsController.DEFAULT_PIE_ZERO_KEY.getName();
+		}
+		if (instance.backspaceKey == null || instance.backspaceKey.isBlank()) {
+			instance.backspaceKey = KeyBindsController.DEFAULT_BACKSPACE_KEY.getName();
+		}
+		instance.flightSpeed = sanitizeFlightSpeed(instance.flightSpeed);
+		instance.thinCCounterX = sanitizeThinCounterX(instance.thinCCounterX);
+		instance.thinCCounterY = sanitizeOptionalAxis(instance.thinCCounterY);
+		instance.thinECounterX = sanitizeThinCounterX(instance.thinECounterX);
 		instance.thinECounterY = sanitizeOptionalAxis(instance.thinECounterY);
 		instance.thinPieChartX = sanitizeOptionalAxis(instance.thinPieChartX);
 		instance.thinPieChartY = sanitizeOptionalAxis(instance.thinPieChartY);
@@ -95,6 +113,23 @@ public final class ToolXConfig {
 		instance.resourceTrackerHudX = sanitizeOptionalAxis(instance.resourceTrackerHudX);
 		instance.resourceTrackerHudY = sanitizeOptionalAxis(instance.resourceTrackerHudY);
 		instance.refreshCachedKeys();
+	}
+
+	private static int sanitizeFlightSpeed(int value) {
+		return Math.clamp(value, 1, 10);
+	}
+
+	private static double sanitizeThinCounterX(double value) {
+		if (!Double.isFinite(value)) {
+			return ThinModeHud.LEFT_STRIP_SNAP;
+		}
+		if (Math.abs(value - ThinModeHud.RIGHT_STRIP_SNAP) < 0.001) {
+			return ThinModeHud.RIGHT_STRIP_SNAP;
+		}
+		if (value < 0.0) {
+			return ThinModeHud.LEFT_STRIP_SNAP;
+		}
+		return Math.clamp(value, 0.0, 1.0);
 	}
 
 	private static double sanitizeOptionalAxis(double value) {
@@ -109,6 +144,8 @@ public final class ToolXConfig {
 		this.cachedEndarKey = parseKey(this.endarKey);
 		this.cachedPiedarKey = parseKey(this.piedarKey);
 		this.cachedPreemptiveNavigationKey = parseKey(this.preemptiveNavigationKey);
+		this.cachedPieZeroKey = parseKey(this.pieZeroKey);
+		this.cachedBackspaceKey = parseKey(this.backspaceKey);
 	}
 
 	public InputConstants.Key eyeMeasurementKey() {
@@ -149,6 +186,26 @@ public final class ToolXConfig {
 		InputConstants.Key resolved = key != null ? key : InputConstants.UNKNOWN;
 		this.preemptiveNavigationKey = resolved.getName();
 		this.cachedPreemptiveNavigationKey = resolved;
+	}
+
+	public InputConstants.Key pieZeroKey() {
+		return this.cachedPieZeroKey != null ? this.cachedPieZeroKey : KeyBindsController.DEFAULT_PIE_ZERO_KEY;
+	}
+
+	public void setPieZeroKey(InputConstants.Key key) {
+		InputConstants.Key resolved = key != null ? key : InputConstants.UNKNOWN;
+		this.pieZeroKey = resolved.getName();
+		this.cachedPieZeroKey = resolved;
+	}
+
+	public InputConstants.Key backspaceKey() {
+		return this.cachedBackspaceKey != null ? this.cachedBackspaceKey : KeyBindsController.DEFAULT_BACKSPACE_KEY;
+	}
+
+	public void setBackspaceKey(InputConstants.Key key) {
+		InputConstants.Key resolved = key != null ? key : InputConstants.UNKNOWN;
+		this.backspaceKey = resolved.getName();
+		this.cachedBackspaceKey = resolved;
 	}
 
 	private static InputConstants.Key parseKey(String name) {

@@ -39,12 +39,13 @@ public class ToolXOptionsList extends OptionsList {
 
 	public void addKeyBind(
 		Component label,
+		InputConstants.Key defaultKey,
 		Supplier<InputConstants.Key> getter,
 		BooleanSupplier isSelected,
 		Runnable onSelect,
 		Runnable onReset
 	) {
-		KeyBindEntry entry = new KeyBindEntry(label, getter, isSelected, onSelect, onReset);
+		KeyBindEntry entry = new KeyBindEntry(label, defaultKey, getter, isSelected, onSelect, onReset);
 		this.addEntry(entry);
 	}
 
@@ -89,6 +90,7 @@ public class ToolXOptionsList extends OptionsList {
 	public final class KeyBindEntry extends OptionsList.AbstractEntry {
 		private static final Component RESET_BUTTON_TITLE = Component.translatable("controls.reset");
 		private final Component label;
+		private final InputConstants.Key defaultKey;
 		private final Supplier<InputConstants.Key> getter;
 		private final BooleanSupplier isSelected;
 		private final Button changeButton;
@@ -97,12 +99,14 @@ public class ToolXOptionsList extends OptionsList {
 
 		private KeyBindEntry(
 			Component label,
+			InputConstants.Key defaultKey,
 			Supplier<InputConstants.Key> getter,
 			BooleanSupplier isSelected,
 			Runnable onSelect,
 			Runnable onReset
 		) {
 			this.label = label;
+			this.defaultKey = defaultKey;
 			this.getter = getter;
 			this.isSelected = isSelected;
 			this.changeButton = Button.builder(label, button -> onSelect.run())
@@ -155,7 +159,7 @@ public class ToolXOptionsList extends OptionsList {
 
 		public void refreshEntry() {
 			InputConstants.Key current = this.getter.get();
-			this.resetButton.active = !current.equals(InputConstants.UNKNOWN);
+			this.resetButton.active = !current.equals(this.defaultKey);
 			this.hasCollision = false;
 			MutableComponent tooltip = Component.empty();
 

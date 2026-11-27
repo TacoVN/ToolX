@@ -3,6 +3,7 @@
 	"package": "com.toolx.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"AbstractRecipeBookScreenAccessor",
 		"CameraMixin",
 		"ChatScreenMixin",
 		"ClientPacketListenerMixin",
@@ -16,8 +17,10 @@
 		"GuiProfilerChartRendererMixin",
 		"HudMixin",
 		"KeyboardHandlerMixin",
+		"LocalPlayerMixin",
 		"MinecraftMixin",
 		"MouseHandlerMixin",
+		"PlayerMixin",
 		"ProfilerPieChartAccessor",
 		"ProfilerPieChartMixin",
 		"SectionOcclusionGraphAccessor"

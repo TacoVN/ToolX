@@ -1,6 +1,8 @@
 package com.toolx.mixin;
 
+import com.toolx.KeyBindsController;
 import com.toolx.PieChartController;
+import com.toolx.gui.StripTransition;
 import com.toolx.gui.ThinModeHud;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -20,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ProfilerPieChart.class)
 public abstract class ProfilerPieChartMixin {
 	@Unique
-	private static final int CHART_HALF_SIZE_Y_2D = 115;
+	private static final int CHART_HALF_SIZE_Y_2D = 64;
 
 	@Shadow
 	private @Nullable ProfileResults profilerPieChartResults;
@@ -39,11 +41,22 @@ public abstract class ProfilerPieChartMixin {
 		return ThinModeHud.shouldRenderThinLayout(Minecraft.getInstance()) ? CHART_HALF_SIZE_Y_2D : original;
 	}
 
-	@Inject(method = "extractRenderState", at = @At("HEAD"))
+	@Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true)
 	private void toolx$prepareThinPieRender(GuiGraphicsExtractor graphics, int width, int height, CallbackInfo info) {
 		this.toolx$pushedThinPie = false;
 		this.toolx$debugWidth = width;
 		this.toolx$debugHeight = height;
+		Minecraft mc = Minecraft.getInstance();
+		if (mc == null || mc.getDebugOverlay() == null || !mc.getDebugOverlay().showProfilerChart()) {
+			ThinModeHud.markPieChartHidden();
+			info.cancel();
+			return;
+		}
+		if (!ThinModeHud.shouldRenderThinLayout(mc) && StripTransition.easedProgress() > 0.0005F && !PieChartController.isRadarActive()) {
+			ThinModeHud.markPieChartHidden();
+			info.cancel();
+			return;
+		}
 		if (this.profilerPieChartResults == null) {
 			ThinModeHud.markPieChartHidden();
 		}
@@ -87,7 +100,14 @@ public abstract class ProfilerPieChartMixin {
 
 	@Inject(method = "profilerPieChartKeyPress", at = @At("HEAD"), cancellable = true)
 	private void toolx$lockPieChartNavigation(int key, CallbackInfo info) {
-		if (PieChartController.isPieChartLocked() || PieChartController.isBoundToDigit(key)) {
+		if (PieChartController.isPieChartLocked()) {
+			info.cancel();
+			return;
+		}
+		if (KeyBindsController.isDispatchingPieZero()) {
+			return;
+		}
+		if (!KeyBindsController.allowVanillaPieChartKey(key) || PieChartController.isBoundToDigit(key)) {
 			info.cancel();
 		}
 	}

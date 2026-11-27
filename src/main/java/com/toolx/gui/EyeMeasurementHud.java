@@ -108,6 +108,17 @@ public final class EyeMeasurementHud {
 		return dragTarget != DragTarget.NONE;
 	}
 
+	public static boolean isHovered(double mouseX, double mouseY) {
+		if (!visible && !zoomVisible) {
+			return false;
+		}
+		double safeScale = lastScale > 0.0F ? lastScale : 1.0F;
+		double scaledX = mouseX / safeScale;
+		double scaledY = mouseY / safeScale;
+		return (zoomVisible && isInside(scaledX, scaledY, zoomX, zoomY, zoomW, zoomH))
+			|| (visible && isInside(scaledX, scaledY, lastX, lastY, lastWidth, lastHeight));
+	}
+
 	private static void ensureIcons() {
 		if (grassIcon == null) {
 			grassIcon = new ItemStack(Items.GRASS_BLOCK);
@@ -554,9 +565,12 @@ public final class EyeMeasurementHud {
 			if (lastScale != 1.0F) {
 				graphics.pose().scale(lastScale, lastScale);
 			}
+			boolean blockedByHigher = ThinModeHud.isHovered(mouseX, mouseY);
+			boolean zoomActive = false;
 			if (zoomVisible) {
-				boolean zoomActive = dragTarget == DragTarget.EYE_ZOOM
+				zoomActive = dragTarget == DragTarget.EYE_ZOOM
 					|| (dragTarget == DragTarget.NONE
+						&& !blockedByHigher
 						&& !ThinModeHud.isDragging()
 						&& !TimerHud.isDragging()
 						&& !ResourceTrackerHud.isDragging()
@@ -566,6 +580,8 @@ public final class EyeMeasurementHud {
 			if (visible) {
 				boolean hudActive = dragTarget == DragTarget.HUD
 					|| (dragTarget == DragTarget.NONE
+						&& !blockedByHigher
+						&& !zoomActive
 						&& !ThinModeHud.isDragging()
 						&& !TimerHud.isDragging()
 						&& !ResourceTrackerHud.isDragging()
