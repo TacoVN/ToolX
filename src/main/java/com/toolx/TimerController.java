@@ -1,7 +1,9 @@
 package com.toolx;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.toolx.gui.TimerHud;
 import java.util.Locale;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.world.level.GameType;
@@ -62,6 +64,62 @@ public final class TimerController {
 			&& minecraft.gameMode.getPlayerMode() == GameType.SURVIVAL;
 	}
 
+	public static boolean isGameplayKey(@Nullable Options options, InputConstants.@Nullable Key key) {
+		if (options == null || key == null || key.equals(InputConstants.UNKNOWN)) {
+			return false;
+		}
+		String keyName = key.getName();
+		for (KeyMapping mapping : gameplayMappings(options)) {
+			if (mapping != null && mapping.saveString().equals(keyName)) {
+				return true;
+			}
+		}
+		if (options.keyHotbarSlots != null) {
+			for (KeyMapping hotbarKey : options.keyHotbarSlots) {
+				if (hotbarKey != null && hotbarKey.saveString().equals(keyName)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	private static boolean anyGameplayKeyDown(Options options) {
+		for (KeyMapping mapping : gameplayMappings(options)) {
+			if (mapping != null && mapping.isDown()) {
+				return true;
+			}
+		}
+		if (options.keyHotbarSlots != null) {
+			for (KeyMapping hotbarKey : options.keyHotbarSlots) {
+				if (hotbarKey != null && hotbarKey.isDown()) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	private static KeyMapping[] gameplayMappings(Options options) {
+		return new KeyMapping[]{
+			options.keyUp,
+			options.keyDown,
+			options.keyLeft,
+			options.keyRight,
+			options.keyJump,
+			options.keyShift,
+			options.keySprint,
+			options.keyAttack,
+			options.keyUse,
+			options.keyPickItem,
+			options.keyInventory,
+			options.keyDrop,
+			options.keySwapOffhand,
+			options.keyTogglePerspective,
+			options.keyAdvancements
+		};
+	}
+
 	public static void onFirstInput(@Nullable Minecraft minecraft) {
 		if (status != TimerStatus.IDLE) {
 			return;
@@ -96,17 +154,7 @@ public final class TimerController {
 		if (status != TimerStatus.IDLE || minecraft == null || minecraft.options == null) {
 			return;
 		}
-		Options options = minecraft.options;
-		if (options.keyUp.isDown()
-			|| options.keyDown.isDown()
-			|| options.keyLeft.isDown()
-			|| options.keyRight.isDown()
-			|| options.keyJump.isDown()
-			|| options.keyShift.isDown()
-			|| options.keySprint.isDown()
-			|| options.keyAttack.isDown()
-			|| options.keyUse.isDown()
-			|| options.keyInventory.isDown()) {
+		if (!minecraft.options.keyDebugModifier.isDown() && anyGameplayKeyDown(minecraft.options)) {
 			onFirstInput(minecraft);
 		}
 	}

@@ -17,7 +17,6 @@ import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -79,6 +78,20 @@ public abstract class KeyboardHandlerMixin {
 	}
 
 	@Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
+	private void toolx$handleBetterNavigationKey(long handle, int action, KeyEvent event, CallbackInfo info) {
+		if (handle == 0L || handle != this.minecraft.getWindow().handle()) {
+			return;
+		}
+		if (action == 0) {
+			PieChartController.onKeyReleased(this.minecraft, event);
+			return;
+		}
+		if ((action == 1 || action == -1) && PieChartController.handleBetterNavigationKey(this.minecraft, action, event)) {
+			info.cancel();
+		}
+	}
+
+	@Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
 	private void toolx$handleBoundBackspaceKey(long handle, int action, KeyEvent event, CallbackInfo info) {
 		if (handle != 0L
 			&& handle == this.minecraft.getWindow().handle()
@@ -102,36 +115,18 @@ public abstract class KeyboardHandlerMixin {
 		if (handle == 0L || handle != this.minecraft.getWindow().handle() || action != 1) {
 			return;
 		}
-		if (!toolx$isNonGameplayKey(event.key())
-			&& !this.minecraft.options.keyDebugModifier.matches(event)
+		InputConstants.Key key = InputConstants.getKey(event);
+		if (!this.minecraft.options.keyDebugModifier.matches(event)
 			&& !this.minecraft.options.keyDebugModifier.isDown()
-			&& !this.minecraft.options.keyChat.matches(event)
-			&& !this.minecraft.options.keyCommand.matches(event)) {
+			&& TimerController.isGameplayKey(this.minecraft.options, key)) {
 			TimerController.onFirstInput(this.minecraft);
 		}
 		if (this.minecraft.options.keyDebugModifier.isDown()) {
 			return;
 		}
-		InputConstants.Key key = InputConstants.getKey(event);
 		if (!PieChartController.handleRadarKey(this.minecraft, key)
 			&& !KeyBindsController.handlePieZeroKey(this.minecraft, key)) {
 			EyeMeasurementController.handleMeasureKey(this.minecraft, key);
 		}
-	}
-
-	@Unique
-	private static boolean toolx$isNonGameplayKey(int key) {
-		return key == InputConstants.KEY_ESCAPE
-			|| key == InputConstants.KEY_F1
-			|| key == InputConstants.KEY_F2
-			|| key == InputConstants.KEY_F11
-			|| key == InputConstants.KEY_LALT
-			|| key == InputConstants.KEY_RALT
-			|| key == InputConstants.KEY_CAPSLOCK
-			|| key == InputConstants.KEY_LGUI
-			|| key == InputConstants.KEY_RGUI
-			|| key == InputConstants.KEY_PRINTSCREEN
-			|| key == InputConstants.KEY_NUMLOCK
-			|| key == InputConstants.KEY_SCROLLLOCK;
 	}
 }

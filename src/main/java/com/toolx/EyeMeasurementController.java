@@ -144,8 +144,7 @@ public final class EyeMeasurementController {
 	}
 
 	public static void onCopyLocation(@Nullable Minecraft minecraft) {
-		if (ToolXConfig.get().eyeMeasurementKey().equals(InputConstants.UNKNOWN)
-			|| minecraft == null
+		if (minecraft == null
 			|| minecraft.level == null
 			|| minecraft.player == null
 			|| minecraft.gui == null

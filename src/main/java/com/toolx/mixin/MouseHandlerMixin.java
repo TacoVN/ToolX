@@ -33,13 +33,26 @@ public abstract class MouseHandlerMixin {
 
 	@Inject(method = "turnPlayer", at = @At("HEAD"))
 	private void toolx$scaleMouseDuringEyeMeasurement(double movementTime, CallbackInfo info) {
-		if (this.accumulatedDX != 0.0 || this.accumulatedDY != 0.0) {
+		if (((MouseHandler) (Object) this).isMouseGrabbed()
+			&& this.minecraft.isWindowActive()
+			&& (this.accumulatedDX != 0.0 || this.accumulatedDY != 0.0)) {
 			TimerController.onFirstInput(this.minecraft);
 		}
 		if (EyeMeasurementController.isMeasuring()) {
 			this.accumulatedDX *= EyeMeasurementController.mouseYawScale(this.minecraft);
 			this.accumulatedDY *= EyeMeasurementController.mousePitchScale(this.minecraft);
 		}
+	}
+
+	@Inject(
+		method = "onScroll",
+		at = @At(
+			value = "INVOKE",
+			target = "Lnet/minecraft/world/entity/player/Inventory;setSelectedSlot(I)V"
+		)
+	)
+	private void toolx$triggerFirstInputOnHotbarScroll(long handle, double xoffset, double yoffset, CallbackInfo info) {
+		TimerController.onFirstInput(this.minecraft);
 	}
 
 	@Inject(method = "onButton", at = @At("HEAD"), cancellable = true)
@@ -68,12 +81,16 @@ public abstract class MouseHandlerMixin {
 			return;
 		}
 		KeyBindsController.syncWindowsKeySuppression(this.minecraft);
-		TimerController.onFirstInput(this.minecraft);
+		InputConstants.Key key = InputConstants.Type.MOUSE.getOrCreate(rawButtonInfo.button());
+		if (!this.minecraft.options.keyDebugModifier.isDown()
+			&& TimerController.isGameplayKey(this.minecraft.options, key)) {
+			TimerController.onFirstInput(this.minecraft);
+		}
 		if (this.minecraft.options.keyDebugModifier.isDown()) {
 			return;
 		}
-		InputConstants.Key key = InputConstants.Type.MOUSE.getOrCreate(rawButtonInfo.button());
 		if (!PieChartController.handleRadarKey(this.minecraft, key)
+			&& !PieChartController.handleBetterNavigationMouse(this.minecraft, key)
 			&& !KeyBindsController.handlePieZeroKey(this.minecraft, key)) {
 			EyeMeasurementController.handleMeasureKey(this.minecraft, key);
 		}

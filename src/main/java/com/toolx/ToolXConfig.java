@@ -26,6 +26,7 @@ public final class ToolXConfig {
 	public double eyeZoomBoxX = -1.0;
 	public double eyeZoomBoxY = -1.0;
 	public boolean pieChartAutoReset = true;
+	public boolean pieChartBetterNavigation = true;
 	public String endarKey = InputConstants.UNKNOWN.getName();
 	public String piedarKey = InputConstants.UNKNOWN.getName();
 	public String preemptiveNavigationKey = InputConstants.UNKNOWN.getName();

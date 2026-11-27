@@ -16,6 +16,7 @@ import com.toolx.EyeMeasurementController.Result;
 import com.toolx.ToolXConfig;
 import com.toolx.gui.ThinModeHud.DebugSpace;
 import com.toolx.mixin.GuiGraphicsExtractorInvoker;
+import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -27,6 +28,7 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -59,8 +61,10 @@ public final class EyeMeasurementHud {
 	private static final int COLOR_GREEN = 0x1FFF1F;
 	private static final int COLOR_RED = 0xFF0B0B;
 	private static final int COLOR_YELLOW = 0xFFDE21;
+	private static final int COLOR_GRAY = 0xAAAAAA;
 
 	private static final int CENTER_CROSSHAIR_HALF = 4;
+	private static final Identifier COMPASS_TEXTURE = Identifier.withDefaultNamespace("textures/item/compass_16.png");
 	private static final Identifier ENDER_EYE_TEXTURE = Identifier.withDefaultNamespace("textures/item/ender_eye.png");
 
 	private enum DragTarget {
@@ -297,6 +301,24 @@ public final class EyeMeasurementHud {
 		boolean atTargetBlock = minecraft.player.getBlockX() == targetBlockX && minecraft.player.getBlockZ() == targetBlockZ;
 		long distance = atTargetBlock ? 0L : Math.round(Math.hypot(dx, dz));
 
+		Component angleText;
+		if (atTargetBlock) {
+			angleText = Component.literal("0.0°");
+		} else {
+			double targetYaw = Math.toDegrees(Math.atan2(-dx, dz));
+			if (Math.abs(targetYaw) < 0.05) {
+				targetYaw = 0.0;
+			}
+			double playerYaw = Mth.wrapDegrees(minecraft.player.getYRot());
+			double deltaYaw = Mth.wrapDegrees((float) (targetYaw - playerYaw));
+			double absDelta = Math.abs(deltaYaw);
+			String yawStr = String.format(Locale.ROOT, "%.1f°", targetYaw);
+			String deltaStr = absDelta < 0.05
+				? " (0.0°)"
+				: String.format(Locale.ROOT, " (%s %.1f°)", deltaYaw > 0.0 ? "→" : "←", absDelta);
+			angleText = Component.literal(yawStr).append(colored(deltaStr, absDelta <= 1.0 ? COLOR_GREEN : COLOR_GRAY));
+		}
+
 		int pct = Math.clamp(Math.round(result.accuracy() * 100.0), 0, 100);
 		int pctColor = pct >= 90 ? COLOR_GREEN : (pct >= 50 ? COLOR_YELLOW : COLOR_RED);
 
@@ -304,6 +326,7 @@ public final class EyeMeasurementHud {
 			Component.literal(result.owX() + ", " + result.owZ()),
 			Component.literal(result.netherX() + ", " + result.netherZ()),
 			Component.literal(String.valueOf(distance)),
+			angleText,
 			colored(pct + "%", pctColor)
 		};
 
@@ -356,7 +379,8 @@ public final class EyeMeasurementHud {
 					switch (i) {
 						case 0 -> graphics.fakeItem(grassIcon, iconX, iconY);
 						case 1 -> graphics.fakeItem(netherrackIcon, iconX, iconY);
-						case 3 -> graphics.blit(RenderPipelines.GUI_TEXTURED, ENDER_EYE_TEXTURE, iconX, iconY, 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+						case 3 -> graphics.blit(RenderPipelines.GUI_TEXTURED, COMPASS_TEXTURE, iconX, iconY, 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+						case 4 -> graphics.blit(RenderPipelines.GUI_TEXTURED, ENDER_EYE_TEXTURE, iconX, iconY, 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
 					}
 				}
 

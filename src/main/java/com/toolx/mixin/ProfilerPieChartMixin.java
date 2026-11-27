@@ -100,6 +100,9 @@ public abstract class ProfilerPieChartMixin {
 
 	@Inject(method = "profilerPieChartKeyPress", at = @At("HEAD"), cancellable = true)
 	private void toolx$lockPieChartNavigation(int key, CallbackInfo info) {
+		if (PieChartController.isDispatchingBetterNavigation()) {
+			return;
+		}
 		if (PieChartController.isPieChartLocked()) {
 			info.cancel();
 			return;

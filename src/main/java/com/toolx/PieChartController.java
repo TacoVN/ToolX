@@ -7,20 +7,24 @@ import com.toolx.mixin.DebugScreenEntryListAccessor;
 import com.toolx.mixin.DebugScreenOverlayAccessor;
 import com.toolx.mixin.ProfilerPieChartAccessor;
 import com.toolx.mixin.SectionOcclusionGraphAccessor;
+import java.util.List;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.DebugScreenOverlay;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.gui.components.debug.DebugScreenEntryStatus;
 import net.minecraft.client.gui.components.debug.DebugScreenProfile;
+import net.minecraft.client.gui.components.debugchart.ProfilerPieChart;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.renderer.SectionOcclusionGraph;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Util;
 import net.minecraft.util.profiling.ProfileResults;
+import net.minecraft.util.profiling.ResultField;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import org.jspecify.annotations.Nullable;
@@ -64,12 +68,166 @@ public final class PieChartController {
 	private static boolean savedChunkBordersPresent;
 	private static @Nullable DebugScreenEntryStatus savedChunkBordersStatus;
 	private static @Nullable DebugScreenProfile savedDebugProfile;
+	private static int betterNavBuffer;
+	private static boolean dispatchingBetterNav;
 
 	private PieChartController() {
 	}
 
 	public static boolean isPieChartLocked() {
 		return activeRadarMode == RadarMode.PIEDAR || activeRadarMode == RadarMode.PREEMPTIVE;
+	}
+
+	public static boolean isDispatchingBetterNavigation() {
+		return dispatchingBetterNav;
+	}
+
+	public static void clearBetterNavigation() {
+		betterNavBuffer = 0;
+	}
+
+	public static void onKeyReleased(@Nullable Minecraft minecraft, KeyEvent event) {
+		if (betterNavBuffer <= 0
+			|| (event.key() != InputConstants.KEY_LCONTROL && event.key() != InputConstants.KEY_RCONTROL)) {
+			return;
+		}
+		boolean otherCtrlDown = (event.key() != InputConstants.KEY_LCONTROL && InputConstants.isKeyDown(InputConstants.KEY_LCONTROL))
+			|| (event.key() != InputConstants.KEY_RCONTROL && InputConstants.isKeyDown(InputConstants.KEY_RCONTROL));
+		if (otherCtrlDown) {
+			return;
+		}
+		int target = betterNavBuffer;
+		betterNavBuffer = 0;
+		if (canUseBetterNavigation(minecraft)) {
+			dispatchPieKey(minecraft, target);
+		}
+	}
+
+	public static boolean handleBetterNavigationKey(@Nullable Minecraft minecraft, int action, KeyEvent event) {
+		if (!canUseBetterNavigation(minecraft)) {
+			return false;
+		}
+		if (event.isEscape() || minecraft.options.keyDebugModifier.matches(event)) {
+			clearBetterNavigation();
+			return false;
+		}
+		if (!event.hasControlDown()) {
+			clearBetterNavigation();
+			return false;
+		}
+		InputConstants.Key pressed = InputConstants.getKey(event);
+		if (isRadarOrEyeKey(pressed)) {
+			return false;
+		}
+		int digit = resolveBetterNavDigit(pressed);
+		if (digit < 0) {
+			return false;
+		}
+		if (action != 1) {
+			return true;
+		}
+		processBetterNavDigit(minecraft, digit);
+		return true;
+	}
+
+	public static boolean handleBetterNavigationMouse(@Nullable Minecraft minecraft, InputConstants.Key pressed) {
+		if (!canUseBetterNavigation(minecraft) || !isCtrlHeld()) {
+			return false;
+		}
+		InputConstants.Key pieZero = ToolXConfig.get().pieZeroKey();
+		if (!pieZero.equals(InputConstants.UNKNOWN) && pieZero.equals(pressed)) {
+			processBetterNavDigit(minecraft, 0);
+			return true;
+		}
+		return false;
+	}
+
+	private static boolean canUseBetterNavigation(@Nullable Minecraft minecraft) {
+		return ToolXConfig.get().pieChartBetterNavigation
+			&& minecraft != null
+			&& minecraft.level != null
+			&& minecraft.player != null
+			&& minecraft.gui != null
+			&& minecraft.gui.overlay() == null
+			&& isAllowedRadarScreen(minecraft.gui.screen())
+			&& minecraft.options != null
+			&& !minecraft.options.keyDebugModifier.isDown()
+			&& minecraft.getDebugOverlay() != null
+			&& minecraft.getDebugOverlay().showProfilerChart();
+	}
+
+	private static boolean isCtrlHeld() {
+		return InputConstants.isKeyDown(InputConstants.KEY_LCONTROL)
+			|| InputConstants.isKeyDown(InputConstants.KEY_RCONTROL);
+	}
+
+	private static boolean isRadarOrEyeKey(InputConstants.Key key) {
+		ToolXConfig config = ToolXConfig.get();
+		return (!config.endarKey().equals(InputConstants.UNKNOWN) && config.endarKey().equals(key))
+			|| (!config.piedarKey().equals(InputConstants.UNKNOWN) && config.piedarKey().equals(key))
+			|| (!config.preemptiveNavigationKey().equals(InputConstants.UNKNOWN) && config.preemptiveNavigationKey().equals(key))
+			|| (!config.eyeMeasurementKey().equals(InputConstants.UNKNOWN) && config.eyeMeasurementKey().equals(key));
+	}
+
+	private static int resolveBetterNavDigit(InputConstants.Key pressed) {
+		if (pressed.getNumericKeyValue().isPresent()) {
+			int d = pressed.getNumericKeyValue().getAsInt();
+			if (d == 0 && betterNavBuffer == 0 && !KeyBindsController.allowVanillaPieChartKey(0)) {
+				return -1;
+			}
+			return d;
+		}
+		InputConstants.Key pieZero = ToolXConfig.get().pieZeroKey();
+		if (!pieZero.equals(InputConstants.UNKNOWN) && pieZero.equals(pressed)) {
+			return 0;
+		}
+		return -1;
+	}
+
+	private static void processBetterNavDigit(Minecraft minecraft, int digit) {
+		if (digit == 0 && betterNavBuffer == 0) {
+			dispatchPieKey(minecraft, 0);
+			return;
+		}
+		int maxEntries = currentPieEntryCount(minecraft);
+		int candidate = betterNavBuffer * 10 + digit;
+		if (maxEntries <= 0 || candidate > maxEntries) {
+			betterNavBuffer = 0;
+			return;
+		}
+		if (candidate * 10 > maxEntries) {
+			betterNavBuffer = 0;
+			dispatchPieKey(minecraft, candidate);
+		} else {
+			betterNavBuffer = candidate;
+		}
+	}
+
+	private static int currentPieEntryCount(Minecraft minecraft) {
+		if (minecraft.getDebugOverlay() == null) {
+			return 0;
+		}
+		ProfilerPieChart pieChart = minecraft.getDebugOverlay().getProfilerPieChart();
+		ProfilerPieChartAccessor accessor = (ProfilerPieChartAccessor) pieChart;
+		ProfileResults results = accessor.toolx$getProfilerPieChartResults();
+		if (results == null) {
+			return 0;
+		}
+		String path = accessor.toolx$getProfilerTreePath();
+		List<ResultField> entries = results.getTimes(path != null ? path : "root");
+		return Math.max(0, entries.size() - 1);
+	}
+
+	private static void dispatchPieKey(Minecraft minecraft, int target) {
+		if (minecraft.getDebugOverlay() == null) {
+			return;
+		}
+		dispatchingBetterNav = true;
+		try {
+			minecraft.getDebugOverlay().getProfilerPieChart().profilerPieChartKeyPress(target);
+		} finally {
+			dispatchingBetterNav = false;
+		}
 	}
 
 	public static boolean isBoundToDigit(int digit) {
@@ -251,6 +409,9 @@ public final class PieChartController {
 	}
 
 	public static void onScreenChanged(@Nullable Minecraft minecraft, @Nullable Screen screen) {
+		if (!isAllowedRadarScreen(screen)) {
+			clearBetterNavigation();
+		}
 		if (activeRadarMode != RadarMode.NONE && !isAllowedWhileRadarActive(screen)) {
 			deactivateRadar(minecraft, true);
 			StripTransition.snapOff();
@@ -265,6 +426,7 @@ public final class PieChartController {
 
 	private static void deactivateRadar(@Nullable Minecraft minecraft, boolean restoreOverlayState) {
 		activeRadarMode = RadarMode.NONE;
+		clearBetterNavigation();
 		ThinModeHud.resetState();
 		syncThinCulling(minecraft);
 		ToolXConfig.get().pieChartAutoReset = savedAutoReset;
@@ -311,6 +473,10 @@ public final class PieChartController {
 			&& !isAllowedWhileRadarActive(minecraft.gui.screen())) {
 			deactivateRadar(minecraft, true);
 			StripTransition.snapOff();
+		}
+
+		if (betterNavBuffer > 0 && (!canUseBetterNavigation(minecraft) || !isCtrlHeld())) {
+			clearBetterNavigation();
 		}
 
 		syncThinCulling(minecraft);
@@ -376,6 +542,7 @@ public final class PieChartController {
 		} else {
 			ThinModeHud.resetState();
 		}
+		clearBetterNavigation();
 		hasLastChunk = false;
 		lastDimension = null;
 		pendingReset = false;

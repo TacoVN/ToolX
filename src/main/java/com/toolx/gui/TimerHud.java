@@ -27,8 +27,8 @@ public final class TimerHud {
 	private static final int TEXT_HEIGHT = 9;
 	private static final double SNAP_THRESHOLD = 6.0;
 
-	private static final int IDLE_TEXT_COLOR = 0xFFFF0B0B;
-	private static final int RUNNING_TEXT_COLOR = 0xFFFFFFFF;
+	private static final int IDLE_TEXT_COLOR = 0xFFFFFFFF;
+	private static final int RUNNING_TEXT_COLOR = 0xFFFFDE21;
 	private static final int COMPLETED_TEXT_COLOR = 0xFF1FFF1F;
 	private static final int OUTLINE_COLOR = 0xFF000000;
 	private static final int IDLE_CHAT_BORDER_COLOR = 0x66FFFFFF;

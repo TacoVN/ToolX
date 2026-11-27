@@ -72,6 +72,12 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 			createToggle("Auto Reset", config.pieChartAutoReset, value -> {
 				config.pieChartAutoReset = value;
 				PieChartController.syncSavedAutoReset(value);
+			}, config),
+			createToggle("Better Navigation", config.pieChartBetterNavigation, value -> {
+				config.pieChartBetterNavigation = value;
+				if (!value) {
+					PieChartController.clearBetterNavigation();
+				}
 			}, config)
 		);
 		this.toolXList.addKeyBind(
@@ -159,7 +165,7 @@ public class ToolXSettingsScreen extends OptionsSubScreen {
 	private void addKeyBindsSection(ToolXConfig config) {
 		this.addHeader("Key Binds");
 		this.toolXList.addKeyBind(
-			Component.literal("0"),
+			Component.literal("Traverse Back"),
 			KeyBindsController.DEFAULT_PIE_ZERO_KEY,
 			config::pieZeroKey,
 			() -> this.selectedKeyBind == KeyBindTarget.PIE_ZERO,
